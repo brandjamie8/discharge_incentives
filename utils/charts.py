@@ -1,3 +1,6 @@
+import plotly.express as px
+import plotly.graph_objects as go
+
 # Define a custom color palette
 CUSTOM_COLORS = {
     "site1": "#1f77b4",
