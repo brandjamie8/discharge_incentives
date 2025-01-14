@@ -8,76 +8,79 @@ import datetime
 # -----------------------
 @st.cache_data
 def load_data():
+    """Load and prepare the CSV data."""
     df = pd.read_csv("data/test_dataset1.csv")
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
     df.sort_values("date", inplace=True)
     return df
 
 # -----------------------
-# Utility function to handle default date ranges
+# Determine Default Date Range
 # -----------------------
 def get_default_date_range(df, freq):
     """
-    Returns a tuple (start_date, end_date) for the default date range
-    based on the global frequency setting.
-    - 'daily': last 30 days
-    - 'weekly': last 26 complete weeks
+    Returns (start_date, end_date) for the default date range:
+      - If 'daily': last 30 days
+      - If 'weekly': last 26 complete weeks (Mon-Sun)
     """
     if df.empty:
-        # If no data, just return today's date
-        return (datetime.date.today(), datetime.date.today())
+        today = datetime.date.today()
+        return today, today
     
     # The latest date in the dataset
     max_date = df["date"].max().date()
     
     if freq == "weekly":
-        # Identify the last "complete" Monday for the end
-        # For instance, if max_date is Wed, we go back to previous Monday
-        # so that it's a "complete" week up to that Monday
+        # Identify the last "complete" Monday as end date
+        # (i.e., if max_date is Wed, we move back to Monday)
         last_monday = max_date - datetime.timedelta(days=max_date.weekday())
         # 26 weeks ago from that Monday
-        start_date = last_monday - pd.Timedelta(weeks=25)
+        start_date = last_monday - datetime.timedelta(weeks=25)
         end_date = last_monday
     else:
-        # daily default: last 30 days
+        # 'daily' => last 30 days
         end_date = max_date
         start_date = end_date - datetime.timedelta(days=29)
     
-    # Ensure no earlier than min_date
+    # Make sure we don't go before the earliest data date
     min_date = df["date"].min().date()
     if start_date < min_date:
         start_date = min_date
     
-    return (start_date, end_date)
+    return start_date, end_date
 
 # -----------------------
-# Utility Function to Aggregate Data
+# Utility: Daily or Weekly Aggregation
 # -----------------------
-def aggregate_data(df, freq, agg_type, metrics):
+def daily_or_weekly(df, freq, agg_map):
     """
-    Given a DataFrame, frequency ('daily' or 'weekly'), 
-    and aggregation type ('sum' or 'mean'), 
-    along with list of metrics, return aggregated data.
+    If freq == 'daily', just return the DataFrame as is (already filtered).
+    If freq == 'weekly', resample by W-MON (Monday to Sunday),
+    labeling each weekly bin by the Monday at the start of the week.
+    `agg_map` is a dict specifying how to aggregate each column, e.g.:
+        {
+          "admissions": "sum",
+          "discharges": "sum",
+          ...
+        }
     """
-    if df.empty or not metrics:
+    if df.empty:
         return df
     
     if freq == "daily":
-        # Just return the original (already filtered) subset
         return df
     
     elif freq == "weekly":
-        # For each metric in metrics, map it to the chosen agg_type
-        agg_map = {}
-        for metric in metrics:
-            agg_map[metric] = agg_type
-        # Resample with W-Mon
-        weekly_df = df.set_index("date").resample("W-Mon").agg(agg_map)
-        weekly_df.reset_index(inplace=True)
+        weekly_df = (
+            df.set_index("date")
+              .resample("W-MON", label="left", closed="left")
+              .agg(agg_map)
+              .reset_index()
+        )
         return weekly_df
-    
-    else:
-        return df
+
+    # Fallback
+    return df
 
 # -----------------------
 # Chart Creation Function
@@ -85,16 +88,16 @@ def aggregate_data(df, freq, agg_type, metrics):
 def create_chart(data, x_col, y_cols, color_map=None, labels=None):
     """
     Create a Plotly line chart for the given DataFrame.
-    x_col: string, name of the x-axis column (e.g. "date")
-    y_cols: list of strings, columns to plot on y-axis
-    color_map: optional dict for custom colors {col_name: color}
-    labels: dict for axis labels
+    x_col:   string, name of the x-axis column (e.g. "date")
+    y_cols:  list of strings, columns to plot on y-axis
+    color_map: optional dict {col_name: color_hex} for custom colors
+    labels:  dict for axis labels
     """
     if color_map:
-        # Build color sequence in the order of y_cols
+        # Align color sequence with y_cols
         color_sequence = [color_map.get(col, "#000000") for col in y_cols]
     else:
-        color_sequence = None  # Use default
+        color_sequence = None
     
     fig = px.line(
         data, 
@@ -124,100 +127,60 @@ st.set_page_config(page_title="LGT Discharge Incentives Dashboard", layout="wide
 st.title("Discharge Incentives Monitoring")
 
 # -----------------------
-# Sidebar (Global Controls)
+# Sidebar Controls
 # -----------------------
 st.sidebar.header("Global Filters & Settings")
 df = load_data()
 
 # Global frequency
-global_freq = st.sidebar.radio("Global Frequency", ["daily", "weekly"], index=0)
+frequency = st.sidebar.radio("Frequency", ["daily", "weekly"], index=0)
 
-# Get default date range for the chosen global frequency
-start_default, end_default = get_default_date_range(df, global_freq)
+# Default date range
+start_default, end_default = get_default_date_range(df, frequency)
 
-# Provide a date_input with a default tuple
+# Let the user pick a date range
 date_input = st.sidebar.date_input(
     "Select Date Range",
     value=(start_default, end_default)
 )
 
-# Handle different ways the user can interact with date_input
-if isinstance(date_input, tuple):
-    if len(date_input) == 2:
-        start_date, end_date = date_input
-    else:
-        # If user only picks one date for some reason
-        start_date = date_input[0]
-        end_date = date_input[0]
+# Safely parse the date input (in case user selects only one date)
+if isinstance(date_input, tuple) and len(date_input) == 2:
+    start_date, end_date = date_input
 elif isinstance(date_input, datetime.date):
     start_date, end_date = date_input, date_input
 else:
-    # Fallback
     start_date, end_date = start_default, end_default
 
-# Now filter data
+# Filter by the selected date range
 filtered_data = df[
     (df["date"] >= pd.to_datetime(start_date)) &
     (df["date"] <= pd.to_datetime(end_date))
 ]
 
 # Site filter
-sites = filtered_data["site"].unique()
-selected_site = st.sidebar.multiselect("Select Site(s)", sites, default=sites)
+all_sites = filtered_data["site"].unique()
+selected_sites = st.sidebar.multiselect("Select Site(s)", all_sites, default=all_sites)
 
-filtered_data = filtered_data[filtered_data["site"].isin(selected_site)]
-
-# -----------------------
-# Quadrant Layout
-# -----------------------
-col1, col2 = st.columns(2)  # top row
-col3, col4 = st.columns(2)  # bottom row
+filtered_data = filtered_data[ filtered_data["site"].isin(selected_sites) ]
 
 # -----------------------
-# CHART 1 (Admissions & Discharges)
+# Layout: Top Row
 # -----------------------
+col1, col2 = st.columns(2)
+
+# Top Left: Admissions & Discharges
 with col1:
-    # Subheader first
-    st.subheader("Admissions & Discharges")
-    
-    # Then the expander
-    with st.expander("Chart 1 Settings (override global)"):
-        # Let user choose to override frequency or use global
-        freq_override_1 = st.radio(
-            "Frequency (Chart 1)",
-            ["Use Global Frequency", "daily", "weekly"],
-            index=0,
-            key="chart1_freq"
-        )
-        # Determine the actual frequency to use for Chart 1
-        if freq_override_1 == "Use Global Frequency":
-            freq_option_1 = global_freq
-        else:
-            freq_option_1 = freq_override_1
-        
-        agg_option_1 = st.radio("Aggregation Type", ["sum", "mean"], index=0, key="chart1_agg")
-        
-        # Available metrics for this chart
-        available_metrics_1 = ["admissions", "discharges"]
-        selected_metrics_1 = st.multiselect(
-            "Select Metrics to Display",
-            available_metrics_1, 
-            default=available_metrics_1
-        )
-    
-    # Aggregate data for Chart 1
-    chart_data_1 = aggregate_data(filtered_data, freq_option_1, agg_option_1, selected_metrics_1)
-    
-    # Build the subheader string based on actual freq used
-    if freq_option_1 == "weekly":
-        subheader_1 = f"Admissions & Discharges per Week (Aggregated by {agg_option_1})"
-    else:
-        subheader_1 = f"Admissions & Discharges per Day (Aggregated by {agg_option_1})"
-    
-    # Show dynamic subheader under the user-facing subheader text
-    st.caption(subheader_1)
-    
-    # Create chart
+    st.subheader("Admissions and Discharges")
+
+    # Aggregate
+    agg_map_adm = {
+        "admissions": "sum",
+        "discharges": "sum"
+    }
+    chart_data_1 = daily_or_weekly(filtered_data, frequency, agg_map_adm)
+
+    # Create & display chart
     color_map_1 = {
         "admissions": "#1f77b4",
         "discharges": "#ff7f0e"
@@ -225,114 +188,63 @@ with col1:
     fig1 = create_chart(
         chart_data_1,
         x_col="date",
-        y_cols=selected_metrics_1,
+        y_cols=["admissions", "discharges"],
         color_map=color_map_1,
         labels={"value": "Patients", "variable": "Metric"}
     )
     st.plotly_chart(fig1, use_container_width=True)
 
-# -----------------------
-# CHART 2 (7+ LoS and 14+ LoS)
-# -----------------------
+# Top Right: 7+ LoS and 14+ LoS
 with col2:
-    # Subheader first
-    st.subheader("Length of Stay (7+ & 14+ Days)")
-    
-    with st.expander("Chart 2 Settings (override global)"):
-        freq_override_2 = st.radio(
-            "Frequency (Chart 2)",
-            ["Use Global Frequency", "daily", "weekly"],
-            index=0,
-            key="chart2_freq"
-        )
-        if freq_override_2 == "Use Global Frequency":
-            freq_option_2 = global_freq
-        else:
-            freq_option_2 = freq_override_2
-        
-        agg_option_2 = st.radio("Aggregation Type", ["sum", "mean"], index=1, key="chart2_agg")
-        
-        available_metrics_2 = ["patients LoS 7+ days", "patients LoS 14+ days"]
-        selected_metrics_2 = st.multiselect(
-            "Select Metrics to Display",
-            available_metrics_2,
-            default=available_metrics_2
-        )
-    
-    chart_data_2 = aggregate_data(filtered_data, freq_option_2, agg_option_2, selected_metrics_2)
-    
-    if freq_option_2 == "weekly":
-        subheader_2 = f"7+ LoS and 14+ LoS per Week (Aggregated by {agg_option_2})"
-    else:
-        subheader_2 = f"7+ LoS and 14+ LoS per Day (Aggregated by {agg_option_2})"
-    
-    st.caption(subheader_2)
-    
+    st.subheader("Average 7+ LoS and 14+ LoS")
+
+    agg_map_los = {
+        "patients LoS 7+ days": "mean",
+        "patients LoS 14+ days": "mean"
+    }
+    chart_data_2 = daily_or_weekly(filtered_data, frequency, agg_map_los)
+
     color_map_2 = {
         "patients LoS 7+ days": "#e377c2",
-        "patients LoS 14+ days": "#17becf",
+        "patients LoS 14+ days": "#17becf"
     }
     fig2 = create_chart(
         chart_data_2,
         x_col="date",
-        y_cols=selected_metrics_2,
+        y_cols=["patients LoS 7+ days", "patients LoS 14+ days"],
         color_map=color_map_2,
         labels={"value": "Patients", "variable": "LoS Category"}
     )
     st.plotly_chart(fig2, use_container_width=True)
 
 # -----------------------
-# CHART 3 (Reserved or Another Metric)
+# Layout: Bottom Row
 # -----------------------
+col3, col4 = st.columns(2)
+
+# Bottom Left: (Reserved / Future)
 with col3:
     st.subheader("Reserved for Future Use")
-    st.write("This quadrant is currently blank or can be used for another chart.")
+    st.write("This quadrant is currently blank.")
 
-# -----------------------
-# CHART 4 (Escalation & Boarded Beds)
-# -----------------------
+# Bottom Right: Escalation & Boarded Beds
 with col4:
-    # Subheader
-    st.subheader("Escalation & Boarded Beds")
-    
-    with st.expander("Chart 3 Settings (override global)"):
-        freq_override_3 = st.radio(
-            "Frequency (Chart 3)",
-            ["Use Global Frequency", "daily", "weekly"],
-            index=0,
-            key="chart3_freq"
-        )
-        if freq_override_3 == "Use Global Frequency":
-            freq_option_3 = global_freq
-        else:
-            freq_option_3 = freq_override_3
-        
-        agg_option_3 = st.radio("Aggregation Type", ["sum", "mean"], index=1, key="chart3_agg")
-        
-        available_metrics_3 = ["escalation beds", "boarded beds"]
-        selected_metrics_3 = st.multiselect(
-            "Select Metrics to Display",
-            available_metrics_3,
-            default=available_metrics_3
-        )
-    
-    chart_data_3 = aggregate_data(filtered_data, freq_option_3, agg_option_3, selected_metrics_3)
+    st.subheader("Average Escalation & Boarded Beds")
 
-    if freq_option_3 == "weekly":
-        subheader_3 = f"Escalation & Boarded Beds per Week (Aggregated by {agg_option_3})"
-    else:
-        subheader_3 = f"Escalation & Boarded Beds per Day (Aggregated by {agg_option_3})"
-
-    st.caption(subheader_3)
+    agg_map_beds = {
+        "escalation beds": "mean",
+        "boarded beds": "mean"
+    }
+    chart_data_3 = daily_or_weekly(filtered_data, frequency, agg_map_beds)
 
     color_map_3 = {
         "escalation beds": "#2ca02c",
-        "boarded beds": "#d62728",
+        "boarded beds": "#d62728"
     }
     fig3 = create_chart(
         chart_data_3,
         x_col="date",
-        y_cols=selected_metrics_3,
+        y_cols=["escalation beds", "boarded beds"],
         color_map=color_map_3,
         labels={"value": "Beds", "variable": "Bed Type"}
     )
