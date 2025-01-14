@@ -225,13 +225,6 @@ with col1:
     )
     st.plotly_chart(fig1, use_container_width=True)
 
-# -----------------------
-# Layout: Bottom Row
-# -----------------------
-col3, col4 = st.columns(2)
-
-# Bottom Left: (Reserved / Future)
-with col3:
     suffix = " (avg per day)" if frequency == "weekly" else " (daily)"
     st.subheader(f"7+ LoS and 14+ LoS{suffix}")
     
@@ -254,9 +247,6 @@ with col3:
     )
     st.plotly_chart(fig2, use_container_width=True)
 
-
-# Bottom Right: Escalation & Boarded Beds
-with col4:
     suffix = " (avg per day)" if frequency == "weekly" else " (daily)"
     st.subheader(f"Escalation & Boarded Beds{suffix}")
     agg_map_beds = {
