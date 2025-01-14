@@ -4,7 +4,7 @@ import plotly.express as px
 
 # Load the dataset
 def load_data():
-    return data = pd.read_csv("data/test_dataset1.csv")
+    return pd.read_csv("data/test_dataset1.csv")
 
 # Streamlit App
 st.set_page_config(page_title="Hospital Performance Dashboard", layout="wide")
