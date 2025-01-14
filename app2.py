@@ -74,7 +74,7 @@ def create_chart(data, x, y, colors, labels):
 with col1:
     agg_type = "sum"  # Default for admissions and discharges
     chart_data = aggregate_data(filtered_data, frequency, agg_type)
-    subheader = f"Total Admissions and Discharges per {'Week' if frequency == 'weekly' else 'Day'}"
+    subheader = f"{'Total ' if frequency == 'weekly' else ''}Total Admissions and Discharges per {'Week' if frequency == 'weekly' else 'Day'}"
     st.subheader(subheader)
     fig1 = create_chart(
         chart_data, "date", ["admissions", "discharges"],
