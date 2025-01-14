@@ -112,8 +112,8 @@ def create_chart(data, x_col, y_cols, color_map=None, labels=None):
             orientation="h", 
             yanchor="bottom", 
             y=1.02, 
-            xanchor="center", 
-            x=0.3
+            xanchor="left", 
+            x=0.05
         ),
         margin=dict(l=0, r=0, t=40, b=0),
     )
