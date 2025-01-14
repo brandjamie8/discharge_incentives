@@ -33,10 +33,10 @@ def get_default_date_range(df, freq):
     if freq == "weekly":
         # Identify the last "complete" Monday as end date
         # (i.e., if max_date is Wed, we move back to Monday)
-        last_monday = max_date - datetime.timedelta(days=max_date.weekday() + 1)
+        last_monday = max_date - datetime.timedelta(days=max_date.weekday())
         # 26 weeks ago from that Monday
         start_date = last_monday - datetime.timedelta(weeks=25)
-        end_date = last_monday
+        end_date = last_monday - datetime.timedelta(days=1)
     else:
         # 'daily' => last 30 days
         end_date = max_date
