@@ -54,9 +54,9 @@ col1, col2 = st.columns(2)
 col3, col4 = st.columns(2)
 
 # Chart Settings
-def create_chart(data, x, y, title, colors, labels):
+def create_chart(data, x, y, colors, labels):
     fig = px.line(
-        data, x=x, y=y, color_discrete_sequence=colors, labels=labels, title=title
+        data, x=x, y=y, color_discrete_sequence=colors, labels=labels
     )
     fig.update_layout(
         template="plotly_white",
@@ -74,7 +74,7 @@ with col1:
     chart_data = aggregate_data(filtered_data, freq, agg_type)
     fig1 = create_chart(
         chart_data, "date", ["admissions", "discharges"],
-        "Admissions and Discharges", ["#1f77b4", "#ff7f0e"], {"value": "Patients", "variable": "Metric"}
+        ["#1f77b4", "#ff7f0e"], {"value": "Patients", "variable": "Metric"}
     )
     st.plotly_chart(fig1, use_container_width=True)
 
@@ -87,7 +87,7 @@ with col2:
     chart_data = aggregate_data(filtered_data, freq, agg_type)
     fig2 = create_chart(
         chart_data, "date", ["patients LoS 7+ days", "patients LoS 14+ days"],
-        "Length of Stay Metrics", ["#e377c2", "#17becf"], {"value": "Patients", "variable": "LoS Category"}
+        ["#e377c2", "#17becf"], {"value": "Patients", "variable": "LoS Category"}
     )
     st.plotly_chart(fig2, use_container_width=True)
 
@@ -100,7 +100,7 @@ with col4:
     chart_data = aggregate_data(filtered_data, freq, agg_type)
     fig3 = create_chart(
         chart_data, "date", ["escalation beds", "boarded beds"],
-        "Escalation and Boarded Beds", ["#2ca02c", "#d62728"], {"value": "Beds", "variable": "Bed Type"}
+        ["#2ca02c", "#d62728"], {"value": "Beds", "variable": "Bed Type"}
     )
     st.plotly_chart(fig3, use_container_width=True)
 
