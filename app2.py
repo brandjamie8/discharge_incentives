@@ -227,8 +227,9 @@ with col1:
 
 # Top Right: 7+ LoS and 14+ LoS
 with col2:
-    st.subheader(f"7+ LoS and 14+ LoS{" (avg per day)" if frequency = "weekly" else ""}")
-
+    suffix = " (avg per day)" if frequency == "weekly" else ""
+    st.subheader(f"7+ LoS and 14+ LoS{suffix}")
+    
     agg_map_los = {
         "patients LoS 7+ days": "mean",
         "patients LoS 14+ days": "mean"
