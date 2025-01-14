@@ -256,8 +256,19 @@ col3, col4 = st.columns(2)
 
 # Bottom Left: (Reserved / Future)
 with col3:
-    st.subheader("Reserved for Future Use")
-    st.write("This quadrant is currently blank.")
+    tooltip_text = (
+        "Data Source: Some CSV from 2023-01 to 2023-12.\n"
+        "Calculation: Weekly average of daily sums across all selected sites."
+    )
+    
+    st.markdown(
+        f"""
+        ### 7+ LoS and 14+ LoS
+        <span style="color:grey;" title="{tooltip_text}">ℹ️</span>
+        """,
+        unsafe_allow_html=True
+    )
+
 
 # Bottom Right: Escalation & Boarded Beds
 with col4:
