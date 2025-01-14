@@ -17,12 +17,19 @@ df = df.sort_values('date')  # Ensure data is sorted by date
 sites = df['site'].unique()
 selected_site = st.sidebar.multiselect("Select Site(s)", sites, default=sites)
 
+frequency = st.sidebar.radio("Frequency", ["daily", "weekly"], index=0)  # Daily/Weekly toggle
 
-
-date_range = st.sidebar.date_input(
-    "Select Date Range", 
-    [df['date'].max() - pd.Timedelta(days=30), df['date'].max()]
-)
+if frequency == "daily":
+    date_range = st.sidebar.date_input(
+        "Select Date Range", 
+        [df['date'].max() - pd.Timedelta(days=30), df['date'].max()]
+    )
+else:  # Default to last 26 full weeks
+    last_full_week = df['date'].max() - pd.Timedelta(days=df['date'].max().weekday())
+    date_range = st.sidebar.date_input(
+        "Select Date Range",
+        [last_full_week - pd.Timedelta(weeks=25), last_full_week]
+    )
 
 # Filtered data
 filtered_data = df[
@@ -30,19 +37,18 @@ filtered_data = df[
     (df['date'].between(pd.to_datetime(date_range[0]), pd.to_datetime(date_range[1])))
 ]
 
-# Aggregation function
 def aggregate_data(data, freq, agg_type):
     if freq == "daily":
         return data
     elif freq == "weekly":
         agg_func = "sum" if agg_type == "sum" else "mean"
         data = data.resample("W-Mon", on="date").agg({
-            "admissions": agg_func,
-            "discharges": agg_func,
-            "patients LoS 7+ days": agg_func,
-            "patients LoS 14+ days": agg_func,
-            "escalation beds": agg_func,
-            "boarded beds": agg_func
+            "admissions": "sum",
+            "discharges": "sum",
+            "patients LoS 7+ days": "mean",
+            "patients LoS 14+ days": "mean",
+            "escalation beds": "mean",
+            "boarded beds": "mean"
         }).reset_index()
         return data
 
@@ -65,13 +71,11 @@ def create_chart(data, x, y, colors, labels):
     )
     return fig
 
-# Top Left: Admissions and Discharges
 with col1:
-    st.subheader("Admissions and Discharges Over Time")
-    with st.expander("Chart Options"):
-        freq = st.radio("Frequency", ["daily", "weekly"], index=0, key="admissions_freq")
-        agg_type = st.radio("Aggregation", ["sum", "average"], index=0, key="admissions_agg")
-    chart_data = aggregate_data(filtered_data, freq, agg_type)
+    agg_type = "sum"  # Default for admissions and discharges
+    chart_data = aggregate_data(filtered_data, frequency, agg_type)
+    subheader = f"Total Admissions and Discharges per {'Week' if frequency == 'weekly' else 'Day'}"
+    st.subheader(subheader)
     fig1 = create_chart(
         chart_data, "date", ["admissions", "discharges"],
         ["#1f77b4", "#ff7f0e"], {"value": "Patients", "variable": "Metric"}
@@ -80,11 +84,10 @@ with col1:
 
 # Top Right: 7+ LoS and 14+ LoS
 with col2:
-    st.subheader("7+ LoS and 14+ LoS Over Time")
-    with st.expander("Chart Options"):
-        freq = st.radio("Frequency", ["daily", "weekly"], index=0, key="los_freq")
-        agg_type = st.radio("Aggregation", ["sum", "average"], index=0, key="los_agg")
-    chart_data = aggregate_data(filtered_data, freq, agg_type)
+    agg_type = "mean"  # Default for LoS metrics
+    chart_data = aggregate_data(filtered_data, frequency, agg_type)
+    subheader = f"Average 7+ LoS and 14+ LoS per {'Week' if frequency == 'weekly' else 'Day'}"
+    st.subheader(subheader)
     fig2 = create_chart(
         chart_data, "date", ["patients LoS 7+ days", "patients LoS 14+ days"],
         ["#e377c2", "#17becf"], {"value": "Patients", "variable": "LoS Category"}
@@ -93,11 +96,10 @@ with col2:
 
 # Bottom Right: Escalation and Boarded Beds
 with col4:
-    st.subheader("Escalation and Boarded Beds Over Time")
-    with st.expander("Chart Options"):
-        freq = st.radio("Frequency", ["daily", "weekly"], index=0, key="beds_freq")
-        agg_type = st.radio("Aggregation", ["sum", "average"], index=0, key="beds_agg")
-    chart_data = aggregate_data(filtered_data, freq, agg_type)
+    agg_type = "mean"  # Default for bed metrics
+    chart_data = aggregate_data(filtered_data, frequency, agg_type)
+    subheader = f"Average Escalation and Boarded Beds per {'Week' if frequency == 'weekly' else 'Day'}"
+    st.subheader(subheader)
     fig3 = create_chart(
         chart_data, "date", ["escalation beds", "boarded beds"],
         ["#2ca02c", "#d62728"], {"value": "Beds", "variable": "Bed Type"}
