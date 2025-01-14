@@ -4,20 +4,22 @@ import plotly.express as px
 
 # Load the dataset
 def load_data():
-    # Replace with your data loading logic
-    return pd.read_csv(r"data/test_dataset1.csv")
+    data['date'] = pd.to_datetime(data['date'], errors='coerce')  # Convert to datetime
+    data = data.sort_values('date')  # Ensure data is sorted by date
+    return data
 
 # Streamlit App
-st.set_page_config(page_title="Healthcare Dashboard", layout="wide")
+st.set_page_config(page_title="Hospital Performance Dashboard", layout="wide")
 
 # Sidebar filters
 st.sidebar.header("Filters")
 df = load_data()
 sites = df['site'].unique()
 selected_site = st.sidebar.multiselect("Select Site(s)", sites, default=sites)
-df['date'] = pd.to_datetime(df['date'], errors='coerce')
-date_range = st.sidebar.date_input("Select Date Range", 
-                                   [df['date'].min().date(), df['date'].max().date()])
+date_range = st.sidebar.date_input(
+    "Select Date Range", 
+    [df['date'].min().to_pydatetime().date(), df['date'].max().to_pydatetime().date()]
+)
 
 # Filtered Data
 filtered_data = df[
@@ -28,46 +30,52 @@ filtered_data = df[
 # Main Title
 st.title("Hospital Performance Dashboard")
 
-# Metrics Section
-st.subheader("Key Performance Metrics")
-col1, col2, col3 = st.columns(3)
+# Quadrant Layout
+col1, col2 = st.columns(2)
+col3, col4 = st.columns(2)
+
+# Top Left: Admissions and Discharges Over Time
 with col1:
-    st.metric("Total Admissions", filtered_data['admissions'].sum())
+    st.subheader("Admissions and Discharges Over Time")
+    fig1 = px.line(
+        filtered_data, x='date', y=['admissions', 'discharges'], 
+        labels={"value": "Patients", "variable": "Metric"},
+        title="Admissions and Discharges"
+    )
+    fig1.update_layout(template="plotly_white", legend_title="Metric")
+    st.plotly_chart(fig1, use_container_width=True)
+
+# Top Right: 7+ LoS and 14+ LoS Over Time
 with col2:
-    st.metric("Total Discharges", filtered_data['discharges'].sum())
+    st.subheader("7+ LoS and 14+ LoS Over Time")
+    fig2 = px.line(
+        filtered_data, x='date', y=['patients LoS 7+ days', 'patients LoS 14+ days'],
+        labels={"value": "Patients", "variable": "Length of Stay"},
+        title="Length of Stay Metrics"
+    )
+    fig2.update_layout(template="plotly_white", legend_title="Length of Stay")
+    st.plotly_chart(fig2, use_container_width=True)
+
+# Bottom Right: Escalation and Boarded Beds Over Time
+with col4:
+    st.subheader("Escalation and Boarded Beds Over Time")
+    fig3 = px.line(
+        filtered_data, x='date', y=['escalation beds', 'boarded beds'],
+        labels={"value": "Beds", "variable": "Bed Type"},
+        title="Escalation and Boarded Beds"
+    )
+    fig3.update_layout(template="plotly_white", legend_title="Bed Type")
+    st.plotly_chart(fig3, use_container_width=True)
+
+# Bottom Left: Reserved for Future Use
 with col3:
-    st.metric("Average Boarded Beds", filtered_data['boarded beds'].mean())
+    st.subheader("Reserved for Future Use")
+    st.write("This quadrant is currently blank.")
 
-# Charts Section
-st.subheader("Trend Analysis")
-
-# Admissions and Discharges Over Time
-fig1 = px.line(filtered_data, x='date', y=['admissions', 'discharges'], 
-               color_discrete_map={'admissions': 'blue', 'discharges': 'green'},
-               labels={"value": "Patients", "variable": "Metric"})
-fig1.update_layout(title="Admissions and Discharges Over Time", template="plotly_white")
-st.plotly_chart(fig1, use_container_width=True)
-
-# Escalation vs. Boarded Beds
-fig2 = px.bar(filtered_data, x='date', y=['escalation beds', 'boarded beds'], 
-              barmode='group', 
-              labels={"value": "Beds", "variable": "Bed Type"})
-fig2.update_layout(title="Escalation and Boarded Beds", template="plotly_white")
-st.plotly_chart(fig2, use_container_width=True)
-
-# LoS Analysis
-fig3 = px.bar(filtered_data, x='site', y=['patients LoS 7+ days', 'patients LoS 14+ days'], 
-              barmode='group', 
-              labels={"value": "Patients", "variable": "LoS Category"})
-fig3.update_layout(title="Length of Stay Analysis", template="plotly_white")
-st.plotly_chart(fig3, use_container_width=True)
-
-# Analysis Section
-st.subheader("Analysis")
-st.write("The data indicates trends in hospital capacity, patient flow, and bed usage. Use this section to write interpretations of the metrics.")
-
-# Data Export
-st.download_button("Download Filtered Data", 
-                   data=filtered_data.to_csv(index=False), 
-                   file_name="filtered_data.csv", 
-                   mime="text/csv")
+# Data Export Button
+st.download_button(
+    label="Download Filtered Data",
+    data=filtered_data.to_csv(index=False),
+    file_name="filtered_data.csv",
+    mime="text/csv"
+)
