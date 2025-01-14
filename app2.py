@@ -151,6 +151,23 @@ def create_chart(data, x_col, y_cols, color_map=None, labels=None):
     return fig
 
 # -----------------------
+# Helper: Return latest & previous values
+# -----------------------
+def get_latest_and_previous_values(series):
+    """
+    Returns (latest_value, previous_value).
+    If there's only one value, previous_value = 0 for delta calc.
+    If empty, returns (0, 0).
+    """
+    if len(series) == 0:
+        return 0, 0
+    elif len(series) == 1:
+        return series.iloc[-1], 0
+    else:
+        return series.iloc[-1], series.iloc[-2]
+
+
+# -----------------------
 # Streamlit Layout
 # -----------------------
 st.set_page_config(page_title="LGT Discharge Incentives Dashboard", layout="wide")
@@ -221,7 +238,24 @@ with tab1:
             "discharges": "sum"
         }
         chart_data_1 = daily_or_weekly(filtered_data, frequency, agg_map_adm)
-    
+        # Get latest & previous values, then display cards
+        latest_adm, prev_adm = get_latest_and_previous_values(chart_data_1["admissions"])
+        latest_dis, prev_dis = get_latest_and_previous_values(chart_data_1["discharges"])
+
+        # 2 columns -> one card for each metric
+        card_col1, card_col2 = st.columns(2)
+        with card_col1:
+            st.metric(
+                label="Admissions (Latest vs Previous)",
+                value=int(latest_adm),
+                delta=int(latest_adm - prev_adm),
+            )
+        with card_col2:
+            st.metric(
+                label="Discharges (Latest vs Previous)",
+                value=int(latest_dis),
+                delta=int(latest_dis - prev_dis),
+            )    
         # Create & display chart
         color_map_1 = {
             "admissions": "#1f77b4",
