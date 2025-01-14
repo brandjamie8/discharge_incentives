@@ -126,11 +126,11 @@ st.title("Discharge Incentives Monitoring")
 # -----------------------
 # Sidebar (Global Controls)
 # -----------------------
-st.sidebar.header("Global Filters & Settings")
+st.sidebar.header("Filters & Settings")
 df = load_data()
 
 # Global frequency
-global_freq = st.sidebar.radio("Global Frequency", ["daily", "weekly"], index=0)
+global_freq = st.sidebar.radio("Frequency", ["daily", "weekly"], index=0)
 
 # Get default date range for the chosen global frequency
 start_default, end_default = get_default_date_range(df, global_freq)
@@ -181,19 +181,16 @@ with col1:
     st.subheader("Admissions & Discharges")
     
     # Then the expander
-    with st.expander("Chart 1 Settings (override global)"):
+    with st.expander("Settings"):
         # Let user choose to override frequency or use global
         freq_override_1 = st.radio(
-            "Frequency (Chart 1)",
-            ["Use Global Frequency", "daily", "weekly"],
+            "Frequency",
+            ["daily", "weekly"],
             index=0,
             key="chart1_freq"
         )
         # Determine the actual frequency to use for Chart 1
-        if freq_override_1 == "Use Global Frequency":
-            freq_option_1 = global_freq
-        else:
-            freq_option_1 = freq_override_1
+        freq_option_1 = freq_override_1
         
         agg_option_1 = st.radio("Aggregation Type", ["sum", "mean"], index=0, key="chart1_agg")
         
