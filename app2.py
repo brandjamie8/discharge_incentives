@@ -16,11 +16,13 @@ df = load_data()
 sites = df['site'].unique()
 selected_site = st.sidebar.multiselect("Select Site(s)", sites, default=sites)
 date_range = st.sidebar.date_input("Select Date Range", 
-                                   [df['date'].min(), df['date'].max()])
+                                   [df['date'].min().date(), df['date'].max().date()])
 
 # Filtered Data
-filtered_data = df[(df['site'].isin(selected_site)) & 
-                   (df['date'].between(*date_range))]
+filtered_data = df[
+    (df['site'].isin(selected_site)) & 
+    (df['date'].between(pd.to_datetime(date_range[0]), pd.to_datetime(date_range[1])))
+]
 
 # Main Title
 st.title("Hospital Performance Dashboard")
