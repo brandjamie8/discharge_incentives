@@ -195,85 +195,88 @@ selected_sites = st.sidebar.multiselect("Select Site(s)", all_sites, default=all
 
 filtered_data = filtered_data[ filtered_data["site"].isin(selected_sites) ]
 
-# -----------------------
-# Layout: Top Row
-# -----------------------
-_, col1, col2 = st.columns([1,7,1])
-
-# Top Left: Admissions & Discharges
-with col1:
-    suffix = " (weekly total)" if frequency == "weekly" else " (daily)"
-    st.subheader(f"Admissions and Discharges{suffix}")
-    # Aggregate
-    agg_map_adm = {
-        "admissions": "sum",
-        "discharges": "sum"
-    }
-    chart_data_1 = daily_or_weekly(filtered_data, frequency, agg_map_adm)
-
-    # Create & display chart
-    color_map_1 = {
-        "admissions": "#1f77b4",
-        "discharges": "#ff7f0e"
-    }
-    fig1 = create_chart(
-        chart_data_1,
-        x_col="date",
-        y_cols=["admissions", "discharges"],
-        color_map=color_map_1,
-        labels={"value": "Patients", "variable": "Metric"}
-    )
-    st.plotly_chart(fig1, use_container_width=True)
-
-    suffix = " (avg per day)" if frequency == "weekly" else " (daily)"
-    st.subheader(f"7+ LoS and 14+ LoS{suffix}")
-    
-    agg_map_los = {
-        "patients LoS 7+ days": "mean",
-        "patients LoS 14+ days": "mean"
-    }
-    chart_data_2 = daily_or_weekly(filtered_data, frequency, agg_map_los)
-
-    color_map_2 = {
-        "patients LoS 7+ days": "#e377c2",
-        "patients LoS 14+ days": "#17becf"
-    }
-    fig2 = create_chart(
-        chart_data_2,
-        x_col="date",
-        y_cols=["patients LoS 7+ days", "patients LoS 14+ days"],
-        color_map=color_map_2,
-        labels={"value": "Patients", "variable": "LoS Category"}
-    )
-    st.plotly_chart(fig2, use_container_width=True)
-
-    suffix = " (avg per day)" if frequency == "weekly" else " (daily)"
-    st.subheader(f"Escalation & Boarded Beds{suffix}")
-    agg_map_beds = {
-        "escalation beds": "mean",
-        "boarded beds": "mean"
-    }
-    chart_data_3 = daily_or_weekly(filtered_data, frequency, agg_map_beds)
-
-    color_map_3 = {
-        "escalation beds": "#2ca02c",
-        "boarded beds": "#d62728"
-    }
-    fig3 = create_chart(
-        chart_data_3,
-        x_col="date",
-        y_cols=["escalation beds", "boarded beds"],
-        color_map=color_map_3,
-        labels={"value": "Beds", "variable": "Bed Type"}
-    )
-    st.plotly_chart(fig3, use_container_width=True)
-
-# -----------------------
-# Data Export
-# -----------------------
 st.download_button(
     label="Download Filtered Data",
     data=filtered_data.to_csv(index=False),
     file_name="filtered_data.csv",
     mime="text/csv"
 )
+
+tab1, tab2 = st.tabs(["Daily Sitrep Metrics", "DPTL Metrics"])
+
+with tab1:
+
+    # -----------------------
+    # Layout: Top Row
+    # -----------------------
+    _, col1, col2 = st.columns([1,7,1])
+    
+    # Top Left: Admissions & Discharges
+    with col1:
+        suffix = " (weekly total)" if frequency == "weekly" else " (daily)"
+        st.subheader(f"Admissions and Discharges{suffix}")
+        # Aggregate
+        agg_map_adm = {
+            "admissions": "sum",
+            "discharges": "sum"
+        }
+        chart_data_1 = daily_or_weekly(filtered_data, frequency, agg_map_adm)
+    
+        # Create & display chart
+        color_map_1 = {
+            "admissions": "#1f77b4",
+            "discharges": "#ff7f0e"
+        }
+        fig1 = create_chart(
+            chart_data_1,
+            x_col="date",
+            y_cols=["admissions", "discharges"],
+            color_map=color_map_1,
+            labels={"value": "Patients", "variable": "Metric"}
+        )
+        st.plotly_chart(fig1, use_container_width=True)
+    
+        suffix = " (avg per day)" if frequency == "weekly" else " (daily)"
+        st.subheader(f"7+ LoS and 14+ LoS{suffix}")
+        
+        agg_map_los = {
+            "patients LoS 7+ days": "mean",
+            "patients LoS 14+ days": "mean"
+        }
+        chart_data_2 = daily_or_weekly(filtered_data, frequency, agg_map_los)
+    
+        color_map_2 = {
+            "patients LoS 7+ days": "#e377c2",
+            "patients LoS 14+ days": "#17becf"
+        }
+        fig2 = create_chart(
+            chart_data_2,
+            x_col="date",
+            y_cols=["patients LoS 7+ days", "patients LoS 14+ days"],
+            color_map=color_map_2,
+            labels={"value": "Patients", "variable": "LoS Category"}
+        )
+        st.plotly_chart(fig2, use_container_width=True)
+    
+        suffix = " (avg per day)" if frequency == "weekly" else " (daily)"
+        st.subheader(f"Escalation & Boarded Beds{suffix}")
+        agg_map_beds = {
+            "escalation beds": "mean",
+            "boarded beds": "mean"
+        }
+        chart_data_3 = daily_or_weekly(filtered_data, frequency, agg_map_beds)
+    
+        color_map_3 = {
+            "escalation beds": "#2ca02c",
+            "boarded beds": "#d62728"
+        }
+        fig3 = create_chart(
+            chart_data_3,
+            x_col="date",
+            y_cols=["escalation beds", "boarded beds"],
+            color_map=color_map_3,
+            labels={"value": "Beds", "variable": "Bed Type"}
+        )
+        st.plotly_chart(fig3, use_container_width=True)
+    
+
