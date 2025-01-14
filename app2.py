@@ -54,33 +54,64 @@ def get_default_date_range(df, freq):
 # -----------------------
 def daily_or_weekly(df, freq, agg_map):
     """
-    If freq == 'daily', just return the DataFrame as is (already filtered).
-    If freq == 'weekly', resample by W-MON (Monday to Sunday),
-    labeling each weekly bin by the Monday at the start of the week.
-    `agg_map` is a dict specifying how to aggregate each column, e.g.:
-        {
-          "admissions": "sum",
-          "discharges": "sum",
-          ...
-        }
+    1) First, aggregate all rows for each date into a single row,
+       combining data for all selected sites on that date using `agg_map`.
+    2) If freq == 'daily', return the daily-aggregated dataframe.
+    3) If freq == 'weekly', resample that daily dataframe by W-MON (Monday start),
+       and apply the same aggregation map.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Already filtered DataFrame (by site, date range, etc.).
+    freq : str
+        Either 'daily' or 'weekly'.
+    agg_map : dict
+        Dict of column -> aggregator, e.g.:
+          {
+            "admissions": "sum",
+            "discharges": "sum",
+            "patients LoS 7+ days": "mean",
+            "patients LoS 14+ days": "mean",
+            ...
+          }
+
+    Returns
+    -------
+    pd.DataFrame
+        Aggregated to daily or weekly timescale, with one row per date/week.
     """
+
     if df.empty:
         return df
-    
+
+    # --- 1) Aggregate to one row per date (summing across sites, etc.) ---
+    #     This collapses all rows for each date into a single daily row.
+    daily_df = (
+        df.groupby("date", as_index=False)
+          .agg(agg_map)
+    )
+
+    # --- 2) If daily frequency, just return daily_df ---
     if freq == "daily":
-        return df
-    
+        return daily_df
+
+    # --- 3) If weekly frequency, resample the daily_df to Monday-based weeks ---
     elif freq == "weekly":
+        # Note: Using 'label="left", closed="left"' means each week's label is the Monday
+        # at the start of that week, and it collects data from Monday 00:00 up to
+        # (but not including) the following Monday.
         weekly_df = (
-            df.set_index("date")
-              .resample("W-MON", label="left", closed="left")
-              .agg(agg_map)
-              .reset_index()
+            daily_df.set_index("date")
+                    .resample("W-MON", label="left", closed="left")
+                    .agg(agg_map)
+                    .reset_index()
         )
         return weekly_df
 
-    # Fallback
-    return df
+    # Fallback if unexpected freq
+    return daily_df
+
 
 # -----------------------
 # Chart Creation Function
