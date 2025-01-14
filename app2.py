@@ -42,6 +42,15 @@ with col1:
         labels={"value": "Patients", "variable": "Metric"},
     )
     fig1.update_layout(template="plotly_white", legend_title="Metric")
+    fig1.update_layout(
+        legend=dict(
+            orientation="h",  # Horizontal orientation
+            yanchor="bottom",  # Align vertically at the bottom
+            y=1.02,            # Position above the chart
+            xanchor="center",  # Center alignment
+            x=0.5              # Center horizontally
+        )
+    )
     st.plotly_chart(fig1, use_container_width=True)
 
 # Top Right: 7+ LoS and 14+ LoS Over Time
