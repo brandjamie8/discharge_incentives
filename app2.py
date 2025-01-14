@@ -7,7 +7,7 @@ def load_data():
     return pd.read_csv("data/test_dataset1.csv")
 
 # Streamlit App
-st.set_page_config(page_title="Hospital Performance Dashboard", layout="wide")
+st.set_page_config(page_title="LGT Discharge Incentives Dashboard", layout="wide")
 
 # Sidebar filters
 st.sidebar.header("Filters")
