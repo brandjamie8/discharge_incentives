@@ -4,9 +4,7 @@ import plotly.express as px
 
 # Load the dataset
 def load_data():
-    data['date'] = pd.to_datetime(data['date'], errors='coerce')  # Convert to datetime
-    data = data.sort_values('date')  # Ensure data is sorted by date
-    return data
+    return data = pd.read_csv("data/test_dataset1.csv")
 
 # Streamlit App
 st.set_page_config(page_title="Hospital Performance Dashboard", layout="wide")
@@ -14,6 +12,8 @@ st.set_page_config(page_title="Hospital Performance Dashboard", layout="wide")
 # Sidebar filters
 st.sidebar.header("Filters")
 df = load_data()
+data['date'] = pd.to_datetime(data['date'], errors='coerce')  # Convert to datetime
+data = data.sort_values('date')  # Ensure data is sorted by date
 sites = df['site'].unique()
 selected_site = st.sidebar.multiselect("Select Site(s)", sites, default=sites)
 date_range = st.sidebar.date_input(
