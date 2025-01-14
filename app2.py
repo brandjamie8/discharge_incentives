@@ -209,7 +209,7 @@ with tab1:
     # -----------------------
     # Layout: Top Row
     # -----------------------
-    _, col1, col2 = st.columns([1,7,1])
+    _, col1, col2 = st.columns([1,10,1])
     
     # Top Left: Admissions & Discharges
     with col1:
