@@ -195,10 +195,10 @@ selected_sites = st.sidebar.multiselect("Select Site(s)", all_sites, default=all
 
 filtered_data = filtered_data[ filtered_data["site"].isin(selected_sites) ]
 
-st.download_button(
-    label="Download Filtered Data",
+st.sidebar.download_button(
+    label="Download Data",
     data=filtered_data.to_csv(index=False),
-    file_name="filtered_data.csv",
+    file_name="discharge_data.csv",
     mime="text/csv"
 )
 
