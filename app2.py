@@ -198,7 +198,7 @@ filtered_data = filtered_data[ filtered_data["site"].isin(selected_sites) ]
 # -----------------------
 # Layout: Top Row
 # -----------------------
-_, col1, col2 = st.columns([1,5,1])
+_, col1, col2 = st.columns([1,7,1])
 
 # Top Left: Admissions & Discharges
 with col1:
