@@ -278,7 +278,24 @@ with tab1:
             "patients LoS 14+ days": "mean"
         }
         chart_data_2 = daily_or_weekly(filtered_data, frequency, agg_map_los)
-    
+        # Get latest & previous values
+        latest_7plus, prev_7plus = get_latest_and_previous_values(chart_data_2["patients LoS 7+ days"])
+        latest_14plus, prev_14plus = get_latest_and_previous_values(chart_data_2["patients LoS 14+ days"])
+
+        # Display metric cards
+        card_col3, card_col4 = st.columns(2)
+        with card_col3:
+            st.metric(
+                label="7+ LoS (Latest vs Previous)",
+                value=round(latest_7plus, 1),
+                delta=round(latest_7plus - prev_7plus, 1),
+            )
+        with card_col4:
+            st.metric(
+                label="14+ LoS (Latest vs Previous)",
+                value=round(latest_14plus, 1),
+                delta=round(latest_14plus - prev_14plus, 1),
+            )    
         color_map_2 = {
             "patients LoS 7+ days": "#e377c2",
             "patients LoS 14+ days": "#17becf"
@@ -299,7 +316,24 @@ with tab1:
             "boarded beds": "mean"
         }
         chart_data_3 = daily_or_weekly(filtered_data, frequency, agg_map_beds)
-    
+        # Get latest & previous values
+        latest_esc, prev_esc = get_latest_and_previous_values(chart_data_3["escalation beds"])
+        latest_boarded, prev_boarded = get_latest_and_previous_values(chart_data_3["boarded beds"])
+
+        # Display metric cards
+        card_col5, card_col6 = st.columns(2)
+        with card_col5:
+            st.metric(
+                label="Escalation Beds (Latest vs Previous)",
+                value=round(latest_esc, 1),
+                delta=round(latest_esc - prev_esc, 1),
+            )
+        with card_col6:
+            st.metric(
+                label="Boarded Beds (Latest vs Previous)",
+                value=round(latest_boarded, 1),
+                delta=round(latest_boarded - prev_boarded, 1),
+            )    
         color_map_3 = {
             "escalation beds": "#2ca02c",
             "boarded beds": "#d62728"
