@@ -202,7 +202,7 @@ col1, col2 = st.columns(2)
 
 # Top Left: Admissions & Discharges
 with col1:
-    suffix = " (weekly total)" if frequency == "weekly" else ""
+    suffix = " (weekly total)" if frequency == "weekly" else " (daily)"
     st.subheader(f"Admissions and Discharges{suffix}")
     # Aggregate
     agg_map_adm = {
@@ -236,7 +236,7 @@ col3, col4 = st.columns(2)
 
 # Bottom Left: (Reserved / Future)
 with col3:
-    suffix = " (avg per day)" if frequency == "weekly" else ""
+    suffix = " (avg per day)" if frequency == "weekly" else "(daily)"
     st.subheader(f"7+ LoS and 14+ LoS{suffix}")
     
     agg_map_los = {
@@ -261,7 +261,7 @@ with col3:
 
 # Bottom Right: Escalation & Boarded Beds
 with col4:
-    suffix = " (avg per day)" if frequency == "weekly" else ""
+    suffix = " (avg per day)" if frequency == "weekly" else "(daily)"
     st.subheader(f"Escalation & Boarded Beds{suffix}")
     agg_map_beds = {
         "escalation beds": "mean",
