@@ -61,6 +61,15 @@ with col2:
         labels={"value": "Patients", "variable": "Length of Stay"},
     )
     fig2.update_layout(template="plotly_white", legend_title="Length of Stay")
+    fig2.update_layout(
+        legend=dict(
+            orientation="h",  # Horizontal orientation
+            yanchor="bottom",  # Align vertically at the bottom
+            y=1.02,            # Position above the chart
+            xanchor="center",  # Center alignment
+            x=0.5              # Center horizontally
+        )
+    )
     st.plotly_chart(fig2, use_container_width=True)
 
 # Bottom Right: Escalation and Boarded Beds Over Time
@@ -71,6 +80,15 @@ with col4:
         labels={"value": "Beds", "variable": "Bed Type"},
     )
     fig3.update_layout(template="plotly_white", legend_title="Bed Type")
+    fig3.update_layout(
+        legend=dict(
+            orientation="h",  # Horizontal orientation
+            yanchor="bottom",  # Align vertically at the bottom
+            y=1.02,            # Position above the chart
+            xanchor="center",  # Center alignment
+            x=0.5              # Center horizontally
+        )
+    )
     st.plotly_chart(fig3, use_container_width=True)
 
 # Bottom Left: Reserved for Future Use
