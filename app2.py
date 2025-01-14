@@ -198,7 +198,7 @@ filtered_data = filtered_data[ filtered_data["site"].isin(selected_sites) ]
 # -----------------------
 # Layout: Top Row
 # -----------------------
-col1, col2 = st.columns(2)
+_, col1, col2 = st.columns(1,5,1)
 
 # Top Left: Admissions & Discharges
 with col1:
@@ -224,10 +224,6 @@ with col1:
         labels={"value": "Patients", "variable": "Metric"}
     )
     st.plotly_chart(fig1, use_container_width=True)
-
-# Top Right: 7+ LoS and 14+ LoS
-with col2:
-    st.subheader(f"Discharges by Pathway")
 
 # -----------------------
 # Layout: Bottom Row
