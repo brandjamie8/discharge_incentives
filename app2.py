@@ -15,6 +15,7 @@ st.sidebar.header("Filters")
 df = load_data()
 sites = df['site'].unique()
 selected_site = st.sidebar.multiselect("Select Site(s)", sites, default=sites)
+df['date'] = pd.to_datetime(df['date'], errors='coerce')
 date_range = st.sidebar.date_input("Select Date Range", 
                                    [df['date'].min().date(), df['date'].max().date()])
 
