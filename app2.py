@@ -40,7 +40,6 @@ with col1:
     fig1 = px.line(
         filtered_data, x='date', y=['admissions', 'discharges'], 
         labels={"value": "Patients", "variable": "Metric"},
-        title="Admissions and Discharges"
     )
     fig1.update_layout(template="plotly_white", legend_title="Metric")
     st.plotly_chart(fig1, use_container_width=True)
@@ -51,7 +50,6 @@ with col2:
     fig2 = px.line(
         filtered_data, x='date', y=['patients LoS 7+ days', 'patients LoS 14+ days'],
         labels={"value": "Patients", "variable": "Length of Stay"},
-        title="Length of Stay Metrics"
     )
     fig2.update_layout(template="plotly_white", legend_title="Length of Stay")
     st.plotly_chart(fig2, use_container_width=True)
@@ -62,7 +60,6 @@ with col4:
     fig3 = px.line(
         filtered_data, x='date', y=['escalation beds', 'boarded beds'],
         labels={"value": "Beds", "variable": "Bed Type"},
-        title="Escalation and Boarded Beds"
     )
     fig3.update_layout(template="plotly_white", legend_title="Bed Type")
     st.plotly_chart(fig3, use_container_width=True)
