@@ -202,8 +202,8 @@ col1, col2 = st.columns(2)
 
 # Top Left: Admissions & Discharges
 with col1:
-    st.subheader("Admissions and Discharges")
-
+    suffix = " (weekly total)" if frequency == "weekly" else ""
+    st.subheader(f"Admissions and Discharges{suffix}")
     # Aggregate
     agg_map_adm = {
         "admissions": "sum",
@@ -261,8 +261,8 @@ with col3:
 
 # Bottom Right: Escalation & Boarded Beds
 with col4:
-    st.subheader("Average Escalation & Boarded Beds")
-
+    suffix = " (avg per day)" if frequency == "weekly" else ""
+    st.subheader(f"Escalation & Boarded Beds{suffix}")
     agg_map_beds = {
         "escalation beds": "mean",
         "boarded beds": "mean"
