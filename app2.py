@@ -28,7 +28,7 @@ filtered_data = df[
 ]
 
 # Main Title
-st.title("Hospital Performance Dashboard")
+st.title("Discharge Incentives Monitoring")
 
 # Quadrant Layout
 col1, col2 = st.columns(2)
