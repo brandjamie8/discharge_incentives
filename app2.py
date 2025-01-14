@@ -227,6 +227,15 @@ with col1:
 
 # Top Right: 7+ LoS and 14+ LoS
 with col2:
+
+
+# -----------------------
+# Layout: Bottom Row
+# -----------------------
+col3, col4 = st.columns(2)
+
+# Bottom Left: (Reserved / Future)
+with col3:
     suffix = " (avg per day)" if frequency == "weekly" else ""
     st.subheader(f"7+ LoS and 14+ LoS{suffix}")
     
@@ -248,26 +257,6 @@ with col2:
         labels={"value": "Patients", "variable": "LoS Category"}
     )
     st.plotly_chart(fig2, use_container_width=True)
-
-# -----------------------
-# Layout: Bottom Row
-# -----------------------
-col3, col4 = st.columns(2)
-
-# Bottom Left: (Reserved / Future)
-with col3:
-    tooltip_text = (
-        "Data Source: Some CSV from 2023-01 to 2023-12.\n"
-        "Calculation: Weekly average of daily sums across all selected sites."
-    )
-    
-    st.markdown(
-        f"""
-        ### 7+ LoS and 14+ LoS
-        <span style="color:grey;" title="{tooltip_text}">ℹ️</span>
-        """,
-        unsafe_allow_html=True
-    )
 
 
 # Bottom Right: Escalation & Boarded Beds
