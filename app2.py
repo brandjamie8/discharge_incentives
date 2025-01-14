@@ -160,7 +160,7 @@ st.title("Discharge Incentives Monitoring")
 # -----------------------
 # Sidebar Controls
 # -----------------------
-st.sidebar.header("Global Filters & Settings")
+st.sidebar.header("Filters & Settings")
 df = load_data()
 
 # Global frequency
@@ -227,7 +227,7 @@ with col1:
 
 # Top Right: 7+ LoS and 14+ LoS
 with col2:
-    st.subheader("Average 7+ LoS and 14+ LoS")
+    st.subheader(f"7+ LoS and 14+ LoS{if frequency = "weekly" then " (avg per day)" else ""}")
 
     agg_map_los = {
         "patients LoS 7+ days": "mean",
