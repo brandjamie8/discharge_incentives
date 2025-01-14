@@ -113,7 +113,7 @@ def create_chart(data, x_col, y_cols, color_map=None, labels=None):
             yanchor="bottom", 
             y=1.02, 
             xanchor="center", 
-            x=0.5
+            x=0.3
         ),
         margin=dict(l=0, r=0, t=40, b=0),
     )
