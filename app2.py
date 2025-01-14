@@ -227,7 +227,7 @@ with col1:
 
 # Top Right: 7+ LoS and 14+ LoS
 with col2:
-
+    st.subheader(f"Discharges by Pathway")
 
 # -----------------------
 # Layout: Bottom Row
