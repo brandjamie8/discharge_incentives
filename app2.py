@@ -9,7 +9,7 @@ import datetime
 @st.cache_data
 def load_data():
     """Load and prepare the CSV data."""
-    df = pd.read_csv("data/test_dataset1.csv")
+    df = pd.read_csv("data/SitrepData.csv")
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
     df.sort_values("date", inplace=True)
     return df
@@ -271,22 +271,22 @@ with tab1:
         st.plotly_chart(fig1, use_container_width=True)
     
         suffix = " (avg per day)" if frequency == "weekly" else " (daily)"
-        st.subheader(f"7+ LoS and 14+ LoS{suffix}")
+        st.subheader(f"21+ LoS and 14+ LoS{suffix}")
         
         agg_map_los = {
-            "patients LoS 7+ days": "mean",
+            "patients LoS 21+ days": "mean",
             "patients LoS 14+ days": "mean"
         }
         chart_data_2 = daily_or_weekly(filtered_data, frequency, agg_map_los)
         # Get latest & previous values
-        latest_7plus, prev_7plus = get_latest_and_previous_values(chart_data_2["patients LoS 7+ days"])
+        latest_7plus, prev_7plus = get_latest_and_previous_values(chart_data_2["patients LoS 21+ days"])
         latest_14plus, prev_14plus = get_latest_and_previous_values(chart_data_2["patients LoS 14+ days"])
 
         # Display metric cards
         card_col3, card_col4 = st.columns(2)
         with card_col3:
             st.metric(
-                label="7+ LoS (Latest vs Previous)",
+                label="21+ LoS (Latest vs Previous)",
                 value=round(latest_7plus, 1),
                 delta=round(latest_7plus - prev_7plus, 1),
             )
@@ -297,13 +297,13 @@ with tab1:
                 delta=round(latest_14plus - prev_14plus, 1),
             )    
         color_map_2 = {
-            "patients LoS 7+ days": "#e377c2",
+            "patients LoS 21+ days": "#e377c2",
             "patients LoS 14+ days": "#17becf"
         }
         fig2 = create_chart(
             chart_data_2,
             x_col="date",
-            y_cols=["patients LoS 7+ days", "patients LoS 14+ days"],
+            y_cols=["patients LoS 21+ days", "patients LoS 14+ days"],
             color_map=color_map_2,
             labels={"value": "Patients", "variable": "LoS Category"}
         )
