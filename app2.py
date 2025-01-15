@@ -440,10 +440,31 @@ else:
     baseline_data2 = pd.DataFrame()
 
 st.sidebar.download_button(
-    label="Download Data (Primary)",
+    label="Download Data",
     data=filtered_data.to_csv(index=False),
     file_name="discharge_data.csv",
     mime="text/csv"
+)
+
+import io
+
+# Create a BytesIO buffer
+output = io.BytesIO()
+
+# Write to an Excel file in memory
+with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+    filtered_data.to_excel(writer, sheet_name="SitrepData", index=False)
+    filtered_data2.to_excel(writer, sheet_name="ExternalDelays", index=False)
+
+# Get the Excel file bytes
+excel_bytes = output.getvalue()
+
+# Provide a download button for the Excel file with two sheets
+st.sidebar.download_button(
+    label="Download Data (Excel with 2 sheets)",
+    data=excel_bytes,
+    file_name="data_extract.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
 
 tab1, tab2 = st.tabs(["Daily Sitrep Metrics", "DPTL Metrics"])
@@ -695,9 +716,10 @@ with tab1:
                     delta=float(round(latest_nmctr - prev_nmctr, 1)),
                 )
                 
-        # Print filters above the chart
+        # -- Print filters above the chart (Sites from the main site filter)
         filters_msg_4 = (
-            f"Filters applied: **Borough** = {', '.join(selected_boroughs)} | "
+            f"Filters applied: **Site** = {', '.join(selected_sites)} | "
+            f"**Borough** = {', '.join(selected_boroughs)} | "
             f"**Pathway** = {', '.join(selected_pathways)}"
         )
         st.markdown(filters_msg_4)
@@ -716,8 +738,7 @@ with tab1:
                 x="date",
                 y="value",
                 color=split_by_4,
-                line_group=split_by_4,
-                facet_row="variable"  # optional, to separate NMCTR vs Total
+                line_group=split_by_4
             )
         else:
             # Single grouping => 2 lines
@@ -808,6 +829,14 @@ with tab1:
                 value=float(round(latest_avg, 2)),
                 delta=float(round(latest_avg - prev_avg, 2))
             )
+            
+        # -- Print filters above chart
+        filters_msg_5 = (
+            f"Filters applied: **Site** = {', '.join(selected_sites)} | "
+            f"**Borough** = {', '.join(selected_boroughs_5)} | "
+            f"**Pathway** = {', '.join(selected_pathways_5)}"
+        )
+        st.markdown(filters_msg_5)
         
         # Build the chart
         if split_by_5 is not None and split_by_5 in chart_data_5.columns:
@@ -840,10 +869,3 @@ with tab1:
         )
         st.plotly_chart(fig5, use_container_width=True)
 
-
-
-# ================================================
-# TAB 2: DPTL METRICS (placeholder)
-# ================================================
-with tab2:
-    st.write("DPTL Metrics content goes here.")
