@@ -861,6 +861,6 @@ with tab1:
                 x=0.05
             )
         )
-        fig4.update_traces(line=dict(width=3))
+        fig5.update_traces(line=dict(width=3))
         st.plotly_chart(fig5, use_container_width=True)
 
