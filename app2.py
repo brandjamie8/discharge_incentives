@@ -694,7 +694,14 @@ with tab1:
                     value=float(round(latest_nmctr, 1)),
                     delta=float(round(latest_nmctr - prev_nmctr, 1)),
                 )
-        
+                
+        # Print filters above the chart
+        filters_msg_4 = (
+            f"Filters applied: **Borough** = {', '.join(selected_boroughs)} | "
+            f"**Pathway** = {', '.join(selected_pathways)}"
+        )
+        st.markdown(filters_msg_4)
+
         # -- Plot chart 4
         if split_by_4 is not None and split_by_4 in chart_data_4.columns:
             # Splitting => multiple lines
@@ -744,7 +751,7 @@ with tab1:
         # ------------------------------------------------
         # CHART 5: Average External Delay Days per Patient
         # ------------------------------------------------
-        suffix = " (ratio of sums)" if frequency == "weekly" else " (daily ratio)"
+        suffix = " (weekly)" if frequency == "weekly" else " (daily ratio)"
         st.subheader(f"Average External Delay Days per Patient{suffix}")
         
         with st.expander("Chart Settings"):
