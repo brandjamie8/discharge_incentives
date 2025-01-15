@@ -10,12 +10,19 @@ import datetime
 # --------------------------------------
 @st.cache_data
 def load_data():
-    """Load and prepare the CSV data."""
+    """Load and prepare the primary CSV data (SitrepData)."""
     df = pd.read_csv("data/SitrepData.csv")
     df["date"] = pd.to_datetime(df["date"], format="%d/%m/%Y", errors="coerce")
     df.sort_values("date", inplace=True)
     return df
 
+@st.cache_data
+def load_external_delay_data():
+    """Load and prepare the second CSV data for external delays."""
+    df2 = pd.read_csv("data/ExternalDelays.csv")
+    df2["date"] = pd.to_datetime(df2["date"], format="%d/%m/%Y", errors="coerce")
+    df2.sort_values("date", inplace=True)
+    return df2
 
 # --------------------------------------
 # Determine Default Date Range
@@ -29,9 +36,9 @@ def get_default_date_range(df, freq):
     if df.empty:
         today = datetime.date.today()
         return today, today
-    
+
     max_date = df["date"].max().date()
-    
+
     if freq == "weekly":
         last_monday = max_date - datetime.timedelta(days=max_date.weekday())
         start_date = last_monday - datetime.timedelta(weeks=25)
@@ -39,20 +46,19 @@ def get_default_date_range(df, freq):
     else:
         end_date = max_date
         start_date = end_date - datetime.timedelta(days=29)
-    
+
     min_date = df["date"].min().date()
     if start_date < min_date:
         start_date = min_date
-    
+
     return start_date, end_date
 
-
 # --------------------------------------
-# New Aggregation Logic
+# Aggregation Logic
 # --------------------------------------
 def aggregate_chart_data(df, frequency, chart_id):
     """
-    Returns a daily or weekly aggregated DataFrame based on:
+    Returns a daily or weekly aggregated DataFrame based on chart_id logic:
       - chart_id=1 => Admissions/Discharges
            * daily => sum
            * weekly => sum (weekly total)
@@ -62,48 +68,39 @@ def aggregate_chart_data(df, frequency, chart_id):
       - chart_id=3 => Escalation & Boarded Beds
            * daily => sum
            * weekly => mean (average per day)
-
-    Steps:
-      1) Always groupby date at a daily level with sum.
-      2) If freq == 'daily', return that daily sum.
-      3) If freq == 'weekly':
-         - if chart_id=1 => resample weekly with .sum()
-         - if chart_id=2 or 3 => resample weekly with .mean()
+      - chart_id=4 => External Delays (NMCTR external delay, Total external delay days)
+           * daily => sum
+           * weekly => mean (average per day)
     """
 
     if df.empty:
         return df
 
-    # Determine which columns we need based on chart_id
     if chart_id == 1:
-        # Chart 1: Admissions & Discharges
         needed_cols = ["admissions", "discharges"]
     elif chart_id == 2:
-        # Chart 2: 21+ LoS & 14+ LoS
         needed_cols = ["patients LoS 21+ days", "patients LoS 14+ days"]
     elif chart_id == 3:
-        # Chart 3: Escalation & Boarded Beds
         needed_cols = ["escalation beds", "boarded beds"]
+    elif chart_id == 4:
+        needed_cols = ["NMCTR external delay", "Total external delay days"]
     else:
-        needed_cols = df.columns.drop(["date", "site"])  # fallback
+        needed_cols = df.columns.drop(["date", "site"], errors="ignore")  # fallback
 
-    # 1) Daily-level sum across sites
+    # 1) Daily-level sum
     daily_agg_map = {col: "sum" for col in needed_cols}
-    daily_df = (
-        df.groupby("date", as_index=False)
-          .agg(daily_agg_map)
-    )
+    daily_df = df.groupby("date", as_index=False).agg(daily_agg_map)
 
     # 2) If daily frequency, return daily_df
     if frequency == "daily":
         return daily_df
 
     # 3) Otherwise, weekly
+    #    chart_id=1 => weekly sum
+    #    chart_id=2,3,4 => weekly mean
     if chart_id == 1:
-        # Chart 1 => weekly sum
         weekly_agg_map = {col: "sum" for col in needed_cols}
     else:
-        # Chart 2 or 3 => weekly average
         weekly_agg_map = {col: "mean" for col in needed_cols}
 
     weekly_df = (
@@ -134,8 +131,6 @@ def get_latest_and_previous_values(series):
 
 # --------------------------------------
 # Chart Creation Functions
-#   (same as before, but we remove any old aggregator calls and
-#    rely on the new aggregate_chart_data() function)
 # --------------------------------------
 def create_line_chart(
     data,
@@ -148,7 +143,6 @@ def create_line_chart(
     baseline_means=None,
     trendline_label="Trendline"
 ):
-    # same code as before ...
     df_melted = data.melt(
         id_vars=[x_col],
         value_vars=y_cols,
@@ -171,6 +165,7 @@ def create_line_chart(
     )
     fig.update_traces(line=dict(width=3))
 
+    # -- Trendline
     if show_trendline:
         for var in y_cols:
             df_var = df_melted[df_melted["variable"] == var].dropna(subset=["value"])
@@ -200,6 +195,7 @@ def create_line_chart(
                 )
             )
 
+    # -- Baseline
     baseline_texts = []
     if show_baseline and baseline_means is not None:
         for var in y_cols:
@@ -225,9 +221,6 @@ def create_line_chart(
             xanchor="left", yanchor="top",
             text=annotation_text,
             showarrow=False,
-            bordercolor=None,
-            borderwidth=1,
-            borderpad=5,
             bgcolor="white"
         )
 
@@ -257,6 +250,7 @@ def create_stacked_bar_chart(data, x_col, y_cols, color_map=None, labels=None):
         color_discrete_map = {var: color_map.get(var, "#000000") for var in y_cols}
     else:
         color_discrete_map = {}
+
     fig = px.bar(
         df_melted,
         x=x_col,
@@ -290,10 +284,13 @@ st.title("Discharge Incentives Monitoring")
 # -- Sidebar --
 st.sidebar.header("Filters & Settings")
 df = load_data()
+df2 = load_external_delay_data()  # <-- Load the second dataset
 
 frequency = st.sidebar.radio("Frequency", ["daily", "weekly"], index=0)
 
+# Determine default date range from primary data
 start_default, end_default = get_default_date_range(df, frequency)
+
 date_input = st.sidebar.date_input("Select Date Range", value=(start_default, end_default))
 if isinstance(date_input, tuple) and len(date_input) == 2:
     start_date, end_date = date_input
@@ -302,15 +299,23 @@ elif isinstance(date_input, datetime.date):
 else:
     start_date, end_date = start_default, end_default
 
+# Filter both datasets by date
 filtered_data = df[
-    (df["date"] >= pd.to_datetime(start_date)) &
+    (df["date"] >= pd.to_datetime(start_date)) & 
     (df["date"] <= pd.to_datetime(end_date))
+]
+
+filtered_data2 = df2[
+    (df2["date"] >= pd.to_datetime(start_date)) & 
+    (df2["date"] <= pd.to_datetime(end_date))
 ]
 
 # Site filter
 all_sites = filtered_data["site"].unique()
 selected_sites = st.sidebar.multiselect("Select Site(s)", all_sites, default=all_sites)
+
 filtered_data = filtered_data[filtered_data["site"].isin(selected_sites)]
+filtered_data2 = filtered_data2[filtered_data2["site"].isin(selected_sites)]
 
 # Baseline option
 st.sidebar.subheader("Baseline Period")
@@ -319,6 +324,7 @@ use_baseline = st.sidebar.checkbox("Define a baseline period?", value=False)
 baseline_means_1 = None
 baseline_means_2 = None
 baseline_means_3 = None
+baseline_means_4 = None  # For external delays
 
 if use_baseline:
     baseline_range = st.sidebar.date_input(
@@ -332,10 +338,16 @@ if use_baseline:
     else:
         baseline_start, baseline_end = start_default, end_default
 
+    # Filter the data for the baseline range (for both datasets)
     baseline_data = df[
         (df["date"] >= pd.to_datetime(baseline_start)) &
         (df["date"] <= pd.to_datetime(baseline_end)) &
         (df["site"].isin(selected_sites))
+    ]
+    baseline_data2 = df2[
+        (df2["date"] >= pd.to_datetime(baseline_start)) &
+        (df2["date"] <= pd.to_datetime(baseline_end)) &
+        (df2["site"].isin(selected_sites))
     ]
 
     # Chart 1 baseline
@@ -359,6 +371,14 @@ if use_baseline:
         "boarded beds": baseline_3["boarded beds"].mean() if not baseline_3.empty else None
     }
 
+    # Chart 4 baseline (External Delays)
+    baseline_4 = aggregate_chart_data(baseline_data2, frequency, chart_id=4)
+    baseline_means_4 = {
+        "NMCTR external delay": baseline_4["NMCTR external delay"].mean() if not baseline_4.empty else None,
+        "Total external delay days": baseline_4["Total external delay days"].mean() if not baseline_4.empty else None
+    }
+
+# Download button (primary data only or you can combine)
 st.sidebar.download_button(
     label="Download Data",
     data=filtered_data.to_csv(index=False),
@@ -370,7 +390,6 @@ tab1, tab2 = st.tabs(["Daily Sitrep Metrics", "DPTL Metrics"])
 
 with tab1:
     _, col1, _ = st.columns([1,10,1])
-    
     with col1:
         # ------------------------------------------------
         # Chart 1: Admissions & Discharges
@@ -378,7 +397,6 @@ with tab1:
         suffix = " (weekly total)" if frequency == "weekly" else " (daily)"
         st.subheader(f"Admissions and Discharges{suffix}")
 
-        # Use the new aggregator logic
         chart_data_1 = aggregate_chart_data(filtered_data, frequency, chart_id=1)
 
         latest_adm, prev_adm = get_latest_and_previous_values(chart_data_1["admissions"])
@@ -502,7 +520,6 @@ with tab1:
         }
 
         if chart_type_3 == "Line":
-            # multi-line
             fig3 = create_line_chart(
                 data=chart_data_3,
                 x_col="date",
@@ -522,6 +539,56 @@ with tab1:
                 labels={"value": "Beds", "variable": "Bed Type"}
             )
         st.plotly_chart(fig3, use_container_width=True)
+
+        # ------------------------------------------------
+        # CHART 4: External Delay (From Second Dataset)
+        # ------------------------------------------------
+        #   - daily => sum
+        #   - weekly => average
+        #   - columns => "NMCTR external delay" & "Total external delay days"
+        suffix = " (avg per day)" if frequency == "weekly" else " (daily)"
+        st.subheader(f"External Delays{suffix}")
+
+        chart_data_4 = aggregate_chart_data(filtered_data2, frequency, chart_id=4)
+
+        # Extract the latest & previous values
+        latest_nmctr, prev_nmctr = get_latest_and_previous_values(chart_data_4["NMCTR external delay"])
+        latest_total, prev_total = get_latest_and_previous_values(chart_data_4["Total external delay days"])
+
+        c7, c8 = st.columns(2)
+        with c7:
+            st.metric(
+                label="NMCTR External Delay (Latest vs Previous)",
+                value=float(round(latest_nmctr, 1)),
+                delta=float(round(latest_nmctr - prev_nmctr, 1)),
+            )
+        with c8:
+            st.metric(
+                label="Total External Delay Days (Latest vs Previous)",
+                value=float(round(latest_total, 1)),
+                delta=float(round(latest_total - prev_total, 1)),
+            )
+
+        with st.expander("Chart Settings"):
+            show_trend_4 = st.checkbox("Show Trendline", value=False, key="ext_trend")
+            show_baseline_4 = st.checkbox("Show Baseline", value=False, key="ext_base")
+
+        color_map_4 = {
+            "NMCTR external delay": "#9467bd",
+            "Total external delay days": "#8c564b"
+        }
+
+        fig4 = create_line_chart(
+            data=chart_data_4,
+            x_col="date",
+            y_cols=["NMCTR external delay", "Total external delay days"],
+            color_map=color_map_4,
+            labels={"value": "Delays", "variable": "Delay Type"},
+            show_trendline=show_trend_4,
+            show_baseline=show_baseline_4,
+            baseline_means=baseline_means_4
+        )
+        st.plotly_chart(fig4, use_container_width=True)
 
 with tab2:
     st.write("DPTL Metrics content goes here.")
