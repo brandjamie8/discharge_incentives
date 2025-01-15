@@ -225,7 +225,7 @@ def create_line_chart(
             xanchor="left", yanchor="top",
             text=annotation_text,
             showarrow=False,
-            bordercolor="black",
+            bordercolor=None,
             borderwidth=1,
             borderpad=5,
             bgcolor="white"
