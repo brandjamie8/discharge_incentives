@@ -10,7 +10,7 @@ import datetime
 def load_data():
     """Load and prepare the CSV data."""
     df = pd.read_csv("data/SitrepData.csv")
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["date"] = pd.to_datetime(df["date"], format="%d/%m/%Y", errors="coerce")
     df.sort_values("date", inplace=True)
     return df
 
