@@ -32,7 +32,6 @@ def get_default_date_range(df, freq):
     
     if freq == "weekly":
         # Identify the last "complete" Monday as end date
-        # (i.e., if max_date is Wed, we move back to Monday)
         last_monday = max_date - datetime.timedelta(days=max_date.weekday())
         # 26 weeks ago from that Monday
         start_date = last_monday - datetime.timedelta(weeks=25)
@@ -59,34 +58,12 @@ def daily_or_weekly(df, freq, agg_map):
     2) If freq == 'daily', return the daily-aggregated dataframe.
     3) If freq == 'weekly', resample that daily dataframe by W-MON (Monday start),
        and apply the same aggregation map.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Already filtered DataFrame (by site, date range, etc.).
-    freq : str
-        Either 'daily' or 'weekly'.
-    agg_map : dict
-        Dict of column -> aggregator, e.g.:
-          {
-            "admissions": "sum",
-            "discharges": "sum",
-            "patients LoS 7+ days": "mean",
-            "patients LoS 14+ days": "mean",
-            ...
-          }
-
-    Returns
-    -------
-    pd.DataFrame
-        Aggregated to daily or weekly timescale, with one row per date/week.
     """
 
     if df.empty:
         return df
 
     # --- 1) Aggregate to one row per date (summing across sites, etc.) ---
-    #     This collapses all rows for each date into a single daily row.
     daily_df = (
         df.groupby("date", as_index=False)
           .agg(agg_map)
@@ -98,9 +75,6 @@ def daily_or_weekly(df, freq, agg_map):
 
     # --- 3) If weekly frequency, resample the daily_df to Monday-based weeks ---
     elif freq == "weekly":
-        # Note: Using 'label="left", closed="left"' means each week's label is the Monday
-        # at the start of that week, and it collects data from Monday 00:00 up to
-        # (but not including) the following Monday.
         weekly_df = (
             daily_df.set_index("date")
                     .resample("W-MON", label="left", closed="left")
@@ -112,38 +86,102 @@ def daily_or_weekly(df, freq, agg_map):
     # Fallback if unexpected freq
     return daily_df
 
-
 # -----------------------
-# Chart Creation Function
+# Chart Creation Functions
 # -----------------------
-def create_chart(data, x_col, y_cols, color_map=None, labels=None):
+def create_line_chart(data, x_col, y_cols, color_map=None, labels=None, show_trendline=False):
     """
-    Create a Plotly line chart for the given DataFrame.
-    x_col:   string, name of the x-axis column (e.g. "date")
-    y_cols:  list of strings, columns to plot on y-axis
-    color_map: optional dict {col_name: color_hex} for custom colors
-    labels:  dict for axis labels
+    Creates a line chart (or scatter with OLS trendline if show_trendline=True)
+    with thicker lines & larger text.
     """
+    # We have multiple Y columns; melt for easier plotting + color grouping
+    df_melted = data.melt(
+        id_vars=[x_col],
+        value_vars=y_cols,
+        var_name="variable",
+        value_name="value"
+    )
+    
+    # Define a color sequence if provided
     if color_map:
-        # Align color sequence with y_cols
         color_sequence = [color_map.get(col, "#000000") for col in y_cols]
     else:
-        color_sequence = None
+        color_sequence = px.colors.qualitative.Plotly  # fallback color palette
     
-    fig = px.line(
-        data, 
-        x=x_col, 
-        y=y_cols,
-        color_discrete_sequence=color_sequence,
-        labels=labels
-    )
+    if show_trendline:
+        # Plot with OLS trendline
+        fig = px.scatter(
+            df_melted,
+            x=x_col,
+            y="value",
+            color="variable",
+            trendline="ols",
+            color_discrete_sequence=color_sequence,
+            labels=labels
+        )
+    else:
+        # Normal line chart
+        fig = px.line(
+            df_melted,
+            x=x_col,
+            y="value",
+            color="variable",
+            color_discrete_sequence=color_sequence,
+            labels=labels
+        )
+        # Thicker lines
+        fig.update_traces(line=dict(width=3))
+
+    # Larger text, consistent layout
     fig.update_layout(
         template="plotly_white",
+        font=dict(size=14),
         legend=dict(
             orientation="h", 
             yanchor="bottom", 
             y=1.02, 
             xanchor="left", 
+            x=0.05
+        ),
+        margin=dict(l=0, r=0, t=40, b=0),
+    )
+    return fig
+
+
+def create_stacked_bar_chart(data, x_col, y_cols, color_map=None, labels=None):
+    """
+    Creates a stacked bar chart for the given DataFrame with larger text.
+    """
+    # Melt the data so each y_col is a separate row
+    df_melted = data.melt(
+        id_vars=[x_col],
+        value_vars=y_cols,
+        var_name="variable",
+        value_name="value"
+    )
+    
+    if color_map:
+        color_sequence = [color_map.get(col, "#000000") for col in y_cols]
+    else:
+        color_sequence = px.colors.qualitative.Plotly
+    
+    fig = px.bar(
+        df_melted,
+        x=x_col,
+        y="value",
+        color="variable",
+        barmode="stack",
+        color_discrete_sequence=color_sequence,
+        labels=labels
+    )
+    fig.update_layout(
+        template="plotly_white",
+        font=dict(size=14),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="left",
             x=0.05
         ),
         margin=dict(l=0, r=0, t=40, b=0),
@@ -228,21 +266,23 @@ with tab1:
     # -----------------------
     _, col1, col2 = st.columns([1,10,1])
     
-    # Top Left: Admissions & Discharges
     with col1:
+        # -----------------------
+        # 1) Admissions & Discharges
+        # -----------------------
         suffix = " (weekly total)" if frequency == "weekly" else " (daily)"
         st.subheader(f"Admissions and Discharges{suffix}")
+        
         # Aggregate
         agg_map_adm = {
             "admissions": "sum",
             "discharges": "sum"
         }
         chart_data_1 = daily_or_weekly(filtered_data, frequency, agg_map_adm)
-        # Get latest & previous values, then display cards
+        # Metrics
         latest_adm, prev_adm = get_latest_and_previous_values(chart_data_1["admissions"])
         latest_dis, prev_dis = get_latest_and_previous_values(chart_data_1["discharges"])
 
-        # 2 columns -> one card for each metric
         card_col1, card_col2 = st.columns(2)
         with card_col1:
             st.metric(
@@ -255,21 +295,32 @@ with tab1:
                 label="Discharges (Latest vs Previous)",
                 value=int(latest_dis),
                 delta=int(latest_dis - prev_dis),
-            )    
-        # Create & display chart
+            )
+        
+        # **Radio button for trend line**:
+        show_trend_1 = st.radio(
+            "Show Trendline (Admissions & Discharges)?",
+            ["No", "Yes"],
+            index=0
+        )
+
         color_map_1 = {
             "admissions": "#1f77b4",
             "discharges": "#ff7f0e"
         }
-        fig1 = create_chart(
+        fig1 = create_line_chart(
             chart_data_1,
             x_col="date",
             y_cols=["admissions", "discharges"],
             color_map=color_map_1,
-            labels={"value": "Patients", "variable": "Metric"}
+            labels={"value": "Patients", "variable": "Metric"},
+            show_trendline=(show_trend_1 == "Yes")
         )
         st.plotly_chart(fig1, use_container_width=True)
     
+        # -----------------------
+        # 2) LoS 21+ and 14+
+        # -----------------------
         suffix = " (avg per day)" if frequency == "weekly" else " (daily)"
         st.subheader(f"21+ LoS and 14+ LoS{suffix}")
         
@@ -278,49 +329,60 @@ with tab1:
             "patients LoS 14+ days": "mean"
         }
         chart_data_2 = daily_or_weekly(filtered_data, frequency, agg_map_los)
-        # Get latest & previous values
-        latest_7plus, prev_7plus = get_latest_and_previous_values(chart_data_2["patients LoS 21+ days"])
+        # Metrics
+        latest_21plus, prev_21plus = get_latest_and_previous_values(chart_data_2["patients LoS 21+ days"])
         latest_14plus, prev_14plus = get_latest_and_previous_values(chart_data_2["patients LoS 14+ days"])
 
-        # Display metric cards
         card_col3, card_col4 = st.columns(2)
         with card_col3:
             st.metric(
                 label="21+ LoS (Latest vs Previous)",
-                value=round(latest_7plus, 1),
-                delta=round(latest_7plus - prev_7plus, 1),
+                value=round(latest_21plus, 1),
+                delta=round(latest_21plus - prev_21plus, 1),
             )
         with card_col4:
             st.metric(
                 label="14+ LoS (Latest vs Previous)",
                 value=round(latest_14plus, 1),
                 delta=round(latest_14plus - prev_14plus, 1),
-            )    
+            )
+        
+        show_trend_2 = st.radio(
+            "Show Trendline (LoS 21+ & 14+)?",
+            ["No", "Yes"],
+            index=0
+        )
+        
         color_map_2 = {
             "patients LoS 21+ days": "#e377c2",
             "patients LoS 14+ days": "#17becf"
         }
-        fig2 = create_chart(
+        fig2 = create_line_chart(
             chart_data_2,
             x_col="date",
             y_cols=["patients LoS 21+ days", "patients LoS 14+ days"],
             color_map=color_map_2,
-            labels={"value": "Patients", "variable": "LoS Category"}
+            labels={"value": "Patients", "variable": "LoS Category"},
+            show_trendline=(show_trend_2 == "Yes")
         )
         st.plotly_chart(fig2, use_container_width=True)
     
+        # -----------------------
+        # 3) Escalation & Boarded Beds (Stacked Bar!)
+        # -----------------------
         suffix = " (avg per day)" if frequency == "weekly" else " (daily)"
         st.subheader(f"Escalation & Boarded Beds{suffix}")
+        
         agg_map_beds = {
             "escalation beds": "mean",
             "boarded beds": "mean"
         }
         chart_data_3 = daily_or_weekly(filtered_data, frequency, agg_map_beds)
-        # Get latest & previous values
+
+        # Metrics
         latest_esc, prev_esc = get_latest_and_previous_values(chart_data_3["escalation beds"])
         latest_boarded, prev_boarded = get_latest_and_previous_values(chart_data_3["boarded beds"])
 
-        # Display metric cards
         card_col5, card_col6 = st.columns(2)
         with card_col5:
             st.metric(
@@ -333,12 +395,14 @@ with tab1:
                 label="Boarded Beds (Latest vs Previous)",
                 value=round(latest_boarded, 1),
                 delta=round(latest_boarded - prev_boarded, 1),
-            )    
+            )
+
+        # No trendline radio here, because we want a bar chart
         color_map_3 = {
             "escalation beds": "#2ca02c",
             "boarded beds": "#d62728"
         }
-        fig3 = create_chart(
+        fig3 = create_stacked_bar_chart(
             chart_data_3,
             x_col="date",
             y_cols=["escalation beds", "boarded beds"],
@@ -346,5 +410,7 @@ with tab1:
             labels={"value": "Beds", "variable": "Bed Type"}
         )
         st.plotly_chart(fig3, use_container_width=True)
-    
 
+with tab2:
+    # ... whatever content you have for DPTL Metrics ...
+    st.write("DPTL Metrics content goes here.")
