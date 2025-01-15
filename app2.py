@@ -635,7 +635,7 @@ with tab1:
         suffix = " (avg per day)" if frequency == "weekly" else " (daily)"
         st.subheader(f"External Delays{suffix}")
         
-        with st.expander("Chart Settings (External Delays)"):
+        with st.expander("Chart Settings"):
             # 1) Borough & Pathway filters
             st.write("**Filter by Borough and Pathway**")
             available_boroughs = sorted(filtered_data2["Borough"].dropna().unique())
@@ -687,7 +687,6 @@ with tab1:
         # -- If no split, show metrics for BOTH NMCTR & Total
         if split_by_4 is None and not chart_data_4.empty:
             latest_nmctr, prev_nmctr = get_latest_and_previous_values(chart_data_4["NMCTR external delay"])
-            latest_total, prev_total = get_latest_and_previous_values(chart_data_4["Total external delay days"])
             c7, c8 = st.columns(2)
             with c7:
                 st.metric(
@@ -695,19 +694,13 @@ with tab1:
                     value=float(round(latest_nmctr, 1)),
                     delta=float(round(latest_nmctr - prev_nmctr, 1)),
                 )
-            with c8:
-                st.metric(
-                    label="Total External Delay Days (Latest vs Previous)",
-                    value=float(round(latest_total, 1)),
-                    delta=float(round(latest_total - prev_total, 1)),
-                )
         
         # -- Plot chart 4
         if split_by_4 is not None and split_by_4 in chart_data_4.columns:
             # Splitting => multiple lines
             df_melted_4 = chart_data_4.melt(
                 id_vars=["date", split_by_4],
-                value_vars=["NMCTR external delay", "Total external delay days"],
+                value_vars=["NMCTR external delay"],
                 var_name="variable",
                 value_name="value"
             )
@@ -723,7 +716,7 @@ with tab1:
             # Single grouping => 2 lines
             df_melted_4 = chart_data_4.melt(
                 id_vars=["date"],
-                value_vars=["NMCTR external delay", "Total external delay days"],
+                value_vars=["NMCTR external delay"],
                 var_name="variable",
                 value_name="value"
             )
@@ -754,7 +747,7 @@ with tab1:
         suffix = " (ratio of sums)" if frequency == "weekly" else " (daily ratio)"
         st.subheader(f"Average External Delay Days per Patient{suffix}")
         
-        with st.expander("Chart Settings (Avg Delay)"):
+        with st.expander("Chart Settings"):
             # Borough & Pathway filters (same approach)
             st.write("**Filter by Borough and Pathway**")
             available_boroughs_5 = sorted(filtered_data2["Borough"].dropna().unique())
