@@ -24,6 +24,7 @@ def load_external_delay_data():
     df2.sort_values("date", inplace=True)
     return df2
 
+
 # --------------------------------------
 # Determine Default Date Range
 # --------------------------------------
@@ -31,7 +32,7 @@ def get_default_date_range(df, freq):
     """
     Returns (start_date, end_date) for the default date range:
       - If 'daily': last 30 days
-      - If 'weekly': last 26 complete weeks (Mon-Sun)
+      - If 'weekly': last 26 complete weeks (Mon-Sun).
     """
     if df.empty:
         today = datetime.date.today()
@@ -40,6 +41,8 @@ def get_default_date_range(df, freq):
     max_date = df["date"].max().date()
 
     if freq == "weekly":
+        # "W-MON" means each week starts Monday, so let's guess that the last
+        # complete week ended on Sunday. We'll pick the last Monday as well.
         last_monday = max_date - datetime.timedelta(days=max_date.weekday())
         start_date = last_monday - datetime.timedelta(weeks=25)
         end_date = last_monday - datetime.timedelta(days=1)
@@ -53,6 +56,10 @@ def get_default_date_range(df, freq):
 
     return start_date, end_date
 
+
+# --------------------------------------
+# Aggregation Logic (Supports chart_id=1..5 and split_by)
+# --------------------------------------
 def aggregate_chart_data(df, frequency, chart_id, split_by=None):
     """
     Returns a daily or weekly aggregated DataFrame based on chart_id logic:
@@ -78,9 +85,7 @@ def aggregate_chart_data(df, frequency, chart_id, split_by=None):
     if df.empty:
         return df
 
-    # -----------------------------
     # Determine which columns we need
-    # -----------------------------
     if chart_id == 1:
         needed_cols = ["admissions", "discharges"]
     elif chart_id == 2:
@@ -90,39 +95,33 @@ def aggregate_chart_data(df, frequency, chart_id, split_by=None):
     elif chart_id == 4:
         needed_cols = ["NMCTR external delay", "Total external delay days"]
     elif chart_id == 5:
-        # For ratio chart, we still need the raw columns to compute ratio
         needed_cols = ["NMCTR external delay", "Total external delay days"]
     else:
         # fallback
         needed_cols = df.columns.drop(["date", "site", "Borough", "Pathway"], errors="ignore")
 
-    # -----------------------------
     # Grouping columns
-    # -----------------------------
     group_cols = ["date"]
     if split_by and split_by in df.columns:
         group_cols.append(split_by)
 
-    # -----------------------------
-    # 1) Daily-level sum
-    # -----------------------------
+    # 1) Daily-level sum or raw data for ratio calculation
     daily_df = (
         df.groupby(group_cols, as_index=False)[needed_cols].sum()
     )
 
-    # If chart_id=5 (average delay), create an "average_delay" column
-    # by dividing the sums: "Total" / "NMCTR", handle zero denominators.
+    # If chart_id=5, we add "average_delay_days" at the daily level
     if chart_id == 5:
         daily_df["average_delay_days"] = daily_df.apply(
-            lambda row: row["Total external delay days"] / row["NMCTR external delay"]
+            lambda row: (row["Total external delay days"] / row["NMCTR external delay"])
             if row["NMCTR external delay"] != 0 else 0,
             axis=1
         )
 
-    # If frequency == daily, we're done (unless chart_id=5, we only need "average_delay_days")
+    # If daily frequency, return the daily data
     if frequency == "daily":
+        # For chart 5, we only need date, split_by, average_delay_days
         if chart_id == 5:
-            # Return only the date, split_by, and the new ratio
             keep_cols = ["date"]
             if split_by and split_by in df.columns:
                 keep_cols.append(split_by)
@@ -131,20 +130,12 @@ def aggregate_chart_data(df, frequency, chart_id, split_by=None):
         else:
             return daily_df
 
-    # -----------------------------
     # 2) Weekly Aggregation
-    # -----------------------------
-    # chart_id=1 => weekly sum
-    # chart_id=2,3,4 => weekly mean
-    # chart_id=5 => ratio of sums (so we must sum at the weekly level, then do ratio)
     daily_df.set_index("date", inplace=True)
 
     if chart_id == 1:
-        weekly_agg_map = {col: "sum" for col in needed_cols}
-        # Keep the grouping column (if present) in the resample
+        # chart_id=1 => weekly sum
         if split_by and split_by in df.columns:
-            # we can't resample directly on multiple index levels easily,
-            # so we might pivot, resample, then unpivot. Or we can do groupby again:
             weekly_df = (
                 daily_df.groupby(split_by)
                         .resample("W-MON", label="left", closed="left")[needed_cols]
@@ -152,6 +143,7 @@ def aggregate_chart_data(df, frequency, chart_id, split_by=None):
                         .reset_index()
             )
         else:
+            weekly_agg_map = {col: "sum" for col in needed_cols}
             weekly_df = (
                 daily_df.resample("W-MON", label="left", closed="left")
                         .agg(weekly_agg_map)
@@ -159,7 +151,7 @@ def aggregate_chart_data(df, frequency, chart_id, split_by=None):
             )
 
     elif chart_id in [2, 3, 4]:
-        weekly_agg_map = {col: "mean" for col in needed_cols}
+        # weekly => mean
         if split_by and split_by in df.columns:
             weekly_df = (
                 daily_df.groupby(split_by)
@@ -168,6 +160,7 @@ def aggregate_chart_data(df, frequency, chart_id, split_by=None):
                         .reset_index()
             )
         else:
+            weekly_agg_map = {col: "mean" for col in needed_cols}
             weekly_df = (
                 daily_df.resample("W-MON", label="left", closed="left")
                         .agg(weekly_agg_map)
@@ -175,7 +168,7 @@ def aggregate_chart_data(df, frequency, chart_id, split_by=None):
             )
 
     elif chart_id == 5:
-        # For chart_id=5, we sum weekly then do ratio
+        # chart_id=5 => ratio of sums at weekly level
         if split_by and split_by in df.columns:
             sum_df = (
                 daily_df.groupby(split_by)
@@ -193,17 +186,14 @@ def aggregate_chart_data(df, frequency, chart_id, split_by=None):
                 .sum()
                 .reset_index()
             )
-
-        # Then compute ratio
         sum_df["average_delay_days"] = sum_df.apply(
-            lambda row: row["Total external delay days"] / row["NMCTR external delay"]
+            lambda row: (row["Total external delay days"] / row["NMCTR external delay"])
             if row["NMCTR external delay"] != 0 else 0,
             axis=1
         )
         weekly_df = sum_df
 
     daily_df.reset_index(drop=True, inplace=True)
-
     return weekly_df.reset_index(drop=True)
 
 
@@ -225,7 +215,7 @@ def get_latest_and_previous_values(series):
 
 
 # --------------------------------------
-# Chart Creation Functions
+# Chart Creation (for the first 3 charts)
 # --------------------------------------
 def create_line_chart(
     data,
@@ -238,6 +228,10 @@ def create_line_chart(
     baseline_means=None,
     trendline_label="Trendline"
 ):
+    """
+    A helper function for multi-line charts (Charts 1-3).
+    For simpler splits, you may adapt or create new code for charts 4 & 5.
+    """
     df_melted = data.melt(
         id_vars=[x_col],
         value_vars=y_cols,
@@ -293,6 +287,7 @@ def create_line_chart(
     # -- Baseline
     baseline_texts = []
     if show_baseline and baseline_means is not None:
+        # baseline_means might be a dict of {col: value}
         for var in y_cols:
             base_val = baseline_means.get(var, None)
             if base_val is None:
@@ -379,14 +374,14 @@ st.title("Discharge Incentives Monitoring")
 # -- Sidebar --
 st.sidebar.header("Filters & Settings")
 df = load_data()
-df2 = load_external_delay_data()  # <-- Load the second dataset
+df2 = load_external_delay_data()  # second dataset for external delays
 
 frequency = st.sidebar.radio("Frequency", ["daily", "weekly"], index=0)
 
-# Determine default date range from primary data
+# Determine default date range (from primary data)
 start_default, end_default = get_default_date_range(df, frequency)
-
 date_input = st.sidebar.date_input("Select Date Range", value=(start_default, end_default))
+
 if isinstance(date_input, tuple) and len(date_input) == 2:
     start_date, end_date = date_input
 elif isinstance(date_input, datetime.date):
@@ -394,14 +389,13 @@ elif isinstance(date_input, datetime.date):
 else:
     start_date, end_date = start_default, end_default
 
-# Filter both datasets by date
+# Filter both datasets by the chosen date range
 filtered_data = df[
-    (df["date"] >= pd.to_datetime(start_date)) & 
+    (df["date"] >= pd.to_datetime(start_date)) &
     (df["date"] <= pd.to_datetime(end_date))
 ]
-
 filtered_data2 = df2[
-    (df2["date"] >= pd.to_datetime(start_date)) & 
+    (df2["date"] >= pd.to_datetime(start_date)) &
     (df2["date"] <= pd.to_datetime(end_date))
 ]
 
@@ -416,11 +410,7 @@ filtered_data2 = filtered_data2[filtered_data2["site"].isin(selected_sites)]
 st.sidebar.subheader("Baseline Period")
 use_baseline = st.sidebar.checkbox("Define a baseline period?", value=False)
 
-baseline_means_1 = None
-baseline_means_2 = None
-baseline_means_3 = None
-baseline_means_4 = None  # For external delays
-
+# Prepare baseline data if needed
 if use_baseline:
     baseline_range = st.sidebar.date_input(
         "Select baseline date range (inclusive):",
@@ -433,7 +423,6 @@ if use_baseline:
     else:
         baseline_start, baseline_end = start_default, end_default
 
-    # Filter the data for the baseline range (for both datasets)
     baseline_data = df[
         (df["date"] >= pd.to_datetime(baseline_start)) &
         (df["date"] <= pd.to_datetime(baseline_end)) &
@@ -444,47 +433,12 @@ if use_baseline:
         (df2["date"] <= pd.to_datetime(baseline_end)) &
         (df2["site"].isin(selected_sites))
     ]
+else:
+    baseline_data = pd.DataFrame()
+    baseline_data2 = pd.DataFrame()
 
-    # Chart 1 baseline
-    baseline_1 = aggregate_chart_data(baseline_data, frequency, chart_id=1)
-    baseline_means_1 = {
-        "admissions": baseline_1["admissions"].mean() if not baseline_1.empty else None,
-        "discharges": baseline_1["discharges"].mean() if not baseline_1.empty else None
-    }
-
-    # Chart 2 baseline
-    baseline_2 = aggregate_chart_data(baseline_data, frequency, chart_id=2)
-    baseline_means_2 = {
-        "patients LoS 21+ days": baseline_2["patients LoS 21+ days"].mean() if not baseline_2.empty else None,
-        "patients LoS 14+ days": baseline_2["patients LoS 14+ days"].mean() if not baseline_2.empty else None
-    }
-
-    # Chart 3 baseline
-    baseline_3 = aggregate_chart_data(baseline_data, frequency, chart_id=3)
-    baseline_means_3 = {
-        "escalation beds": baseline_3["escalation beds"].mean() if not baseline_3.empty else None,
-        "boarded beds": baseline_3["boarded beds"].mean() if not baseline_3.empty else None
-    }
-
-    # Example: baseline for external delays (chart 4)
-    baseline_4 = aggregate_chart_data(
-        baseline_data2, 
-        frequency, 
-        chart_id=4, 
-        split_by=split_option_4  # Same radio selection
-    )
-    # Then you'd compute a dictionary of means for each group or each column
-    
-    # Example: baseline for average delays (chart 5)
-    baseline_5 = aggregate_chart_data(
-        baseline_data2, 
-        frequency, 
-        chart_id=5, 
-        split_by=split_option_5
-    )
-# Download button (primary data only or you can combine)
 st.sidebar.download_button(
-    label="Download Data",
+    label="Download Data (Primary)",
     data=filtered_data.to_csv(index=False),
     file_name="discharge_data.csv",
     mime="text/csv"
@@ -492,19 +446,22 @@ st.sidebar.download_button(
 
 tab1, tab2 = st.tabs(["Daily Sitrep Metrics", "DPTL Metrics"])
 
+# ================================================
+# TAB 1: DAILY SITREP METRICS
+# ================================================
 with tab1:
     _, col1, _ = st.columns([1,10,1])
     with col1:
         # ------------------------------------------------
-        # Chart 1: Admissions & Discharges
+        # CHART 1: Admissions & Discharges
         # ------------------------------------------------
         suffix = " (weekly total)" if frequency == "weekly" else " (daily)"
         st.subheader(f"Admissions and Discharges{suffix}")
 
         chart_data_1 = aggregate_chart_data(filtered_data, frequency, chart_id=1)
 
-        latest_adm, prev_adm = get_latest_and_previous_values(chart_data_1["admissions"])
-        latest_dis, prev_dis = get_latest_and_previous_values(chart_data_1["discharges"])
+        latest_adm, prev_adm = get_latest_and_previous_values(chart_data_1["admissions"]) if not chart_data_1.empty else (0, 0)
+        latest_dis, prev_dis = get_latest_and_previous_values(chart_data_1["discharges"]) if not chart_data_1.empty else (0, 0)
 
         c1, c2 = st.columns(2)
         with c1:
@@ -520,10 +477,18 @@ with tab1:
                 delta=int(latest_dis - prev_dis),
             )
 
-        # Chart Settings
         with st.expander("Chart Settings"):
             show_trend_1 = st.checkbox("Show Trendline", value=False, key="adm_dis_trend")
             show_baseline_1 = st.checkbox("Show Baseline", value=False, key="adm_dis_base")
+
+        baseline_means_1 = None
+        if use_baseline and show_baseline_1:
+            baseline_1 = aggregate_chart_data(baseline_data, frequency, chart_id=1)
+            if not baseline_1.empty:
+                baseline_means_1 = {
+                    "admissions": baseline_1["admissions"].mean(),
+                    "discharges": baseline_1["discharges"].mean()
+                }
 
         color_map_1 = {"admissions": "#1f77b4", "discharges": "#ff7f0e"}
         fig1 = create_line_chart(
@@ -539,15 +504,15 @@ with tab1:
         st.plotly_chart(fig1, use_container_width=True)
 
         # ------------------------------------------------
-        # Chart 2: 21+ LoS & 14+ LoS
+        # CHART 2: 21+ LoS & 14+ LoS
         # ------------------------------------------------
         suffix = " (avg per day)" if frequency == "weekly" else " (daily)"
         st.subheader(f"21+ LoS and 14+ LoS{suffix}")
 
         chart_data_2 = aggregate_chart_data(filtered_data, frequency, chart_id=2)
 
-        latest_21plus, prev_21plus = get_latest_and_previous_values(chart_data_2["patients LoS 21+ days"])
-        latest_14plus, prev_14plus = get_latest_and_previous_values(chart_data_2["patients LoS 14+ days"])
+        latest_21plus, prev_21plus = get_latest_and_previous_values(chart_data_2["patients LoS 21+ days"]) if not chart_data_2.empty else (0, 0)
+        latest_14plus, prev_14plus = get_latest_and_previous_values(chart_data_2["patients LoS 14+ days"]) if not chart_data_2.empty else (0, 0)
 
         c3, c4 = st.columns(2)
         with c3:
@@ -567,6 +532,15 @@ with tab1:
             show_trend_2 = st.checkbox("Show Trendline", value=False, key="los_trend")
             show_baseline_2 = st.checkbox("Show Baseline", value=False, key="los_base")
 
+        baseline_means_2 = None
+        if use_baseline and show_baseline_2:
+            baseline_2 = aggregate_chart_data(baseline_data, frequency, chart_id=2)
+            if not baseline_2.empty:
+                baseline_means_2 = {
+                    "patients LoS 21+ days": baseline_2["patients LoS 21+ days"].mean(),
+                    "patients LoS 14+ days": baseline_2["patients LoS 14+ days"].mean()
+                }
+
         color_map_2 = {
             "patients LoS 21+ days": "#e377c2",
             "patients LoS 14+ days": "#17becf"
@@ -584,15 +558,15 @@ with tab1:
         st.plotly_chart(fig2, use_container_width=True)
 
         # ------------------------------------------------
-        # Chart 3: Escalation & Boarded Beds
+        # CHART 3: Escalation & Boarded Beds
         # ------------------------------------------------
         suffix = " (avg per day)" if frequency == "weekly" else " (daily)"
         st.subheader(f"Escalation & Boarded Beds{suffix}")
 
         chart_data_3 = aggregate_chart_data(filtered_data, frequency, chart_id=3)
 
-        latest_esc, prev_esc = get_latest_and_previous_values(chart_data_3["escalation beds"])
-        latest_boarded, prev_boarded = get_latest_and_previous_values(chart_data_3["boarded beds"])
+        latest_esc, prev_esc = get_latest_and_previous_values(chart_data_3["escalation beds"]) if not chart_data_3.empty else (0, 0)
+        latest_boarded, prev_boarded = get_latest_and_previous_values(chart_data_3["boarded beds"]) if not chart_data_3.empty else (0, 0)
 
         c5, c6 = st.columns(2)
         with c5:
@@ -617,6 +591,15 @@ with tab1:
                 index=0,
                 key="beds_chart_type"
             )
+
+        baseline_means_3 = None
+        if use_baseline and show_baseline_3:
+            baseline_3 = aggregate_chart_data(baseline_data, frequency, chart_id=3)
+            if not baseline_3.empty:
+                baseline_means_3 = {
+                    "escalation beds": baseline_3["escalation beds"].mean(),
+                    "boarded beds": baseline_3["boarded beds"].mean()
+                }
 
         color_map_3 = {
             "escalation beds": "#2ca02c",
@@ -644,172 +627,206 @@ with tab1:
             )
         st.plotly_chart(fig3, use_container_width=True)
 
-        st.subheader("External Delays")
-            
-            # -- Collapsible Chart Settings
-            with st.expander("Chart Settings for External Delays"):
-                split_option_4 = st.radio(
-                    "Split By:",
-                    ["None", "site", "Borough", "Pathway"],
-                    index=0,  # default to 'None'
-                    key="ext_split_4"
-                )
-                show_trend_4 = st.checkbox("Show Trendline", value=False, key="ext_trend_4")
-                show_baseline_4 = st.checkbox("Show Baseline", value=False, key="ext_base_4")
-        
-            # Convert "None" to None
-            split_by_4 = None if split_option_4 == "None" else split_option_4
-        
-            chart_data_4 = aggregate_chart_data(
-                filtered_data2, 
-                frequency, 
-                chart_id=4, 
-                split_by=split_by_4
+        # ------------------------------------------------
+        # CHART 4: External Delay (NMCTR & Total)
+        # ------------------------------------------------
+        suffix = " (avg per day)" if frequency == "weekly" else " (daily)"
+        st.subheader(f"External Delays{suffix}")
+
+        with st.expander("Chart Settings (External Delays)"):
+            split_option_4 = st.radio(
+                "Split By:",
+                ["None", "site", "Borough", "Pathway"],
+                index=0,
+                key="ext_split_4"
             )
-        
-            # If you want baseline lines for each group, similarly aggregate the baseline:
-            baseline_means_4 = {}
-            if use_baseline and show_baseline_4:
-                baseline_4 = aggregate_chart_data(baseline_data2, frequency, chart_id=4, split_by=split_by_4)
-                # For each numeric column in baseline_4, compute mean per group if splitted:
-                if split_by_4 is not None and split_by_4 in baseline_4.columns:
-                    # baseline_4 might have multiple rows per group
-                    # You could create a dict-of-dicts like {group: {col: mean}}
-                    for grp, subdf in baseline_4.groupby(split_by_4):
-                        for col in ["NMCTR external delay", "Total external delay days"]:
-                            if col not in baseline_means_4:
-                                baseline_means_4[col] = {}
-                            baseline_means_4[col][grp] = subdf[col].mean()
-                else:
-                    # Single group overall
-                    for col in ["NMCTR external delay", "Total external delay days"]:
-                        baseline_means_4[col] = baseline_4[col].mean()
+            show_trend_4 = st.checkbox("Show Trendline", value=False, key="ext_trend_4")
+            show_baseline_4 = st.checkbox("Show Baseline", value=False, key="ext_base_4")
+
+        split_by_4 = None if split_option_4 == "None" else split_option_4
+
+        chart_data_4 = aggregate_chart_data(
+            filtered_data2,
+            frequency,
+            chart_id=4,
+            split_by=split_by_4
+        )
+
+        # Baseline for chart 4 if needed
+        baseline_means_4 = None
+        if use_baseline and show_baseline_4:
+            baseline_4 = aggregate_chart_data(baseline_data2, frequency, chart_id=4, split_by=split_by_4)
+            # For multi-group, you'd have to compute means per group:
+            if split_by_4 is not None and split_by_4 in baseline_4.columns:
+                # e.g. { "NMCTR external delay": {group: mean}, "Total external delay days": {group: mean} }
+                baseline_means_4 = {}
+                for col in ["NMCTR external delay", "Total external delay days"]:
+                    baseline_means_4[col] = {}
+                for grp, subdf in baseline_4.groupby(split_by_4):
+                    baseline_means_4["NMCTR external delay"][grp] = subdf["NMCTR external delay"].mean()
+                    baseline_means_4["Total external delay days"][grp] = subdf["Total external delay days"].mean()
             else:
-                baseline_means_4 = None
-        
-            # Calculate latest vs previous (when not splitted)
-            # If splitted, you'd have to handle it differently. Example below is for "None"
-            if split_by_4 is None:
-                latest_nmctr, prev_nmctr = get_latest_and_previous_values(chart_data_4["NMCTR external delay"])
-                latest_total, prev_total = get_latest_and_previous_values(chart_data_4["Total external delay days"])
-                c7, c8 = st.columns(2)
-                with c7:
-                    st.metric(
-                        label="NMCTR External Delay (Latest vs Previous)",
-                        value=float(round(latest_nmctr, 1)),
-                        delta=float(round(latest_nmctr - prev_nmctr, 1)),
-                    )
-                with c8:
-                    st.metric(
-                        label="Total External Delay Days (Latest vs Previous)",
-                        value=float(round(latest_total, 1)),
-                        delta=float(round(latest_total - prev_total, 1)),
-                    )
-        
-            # Create the chart
-            # For splitted data, color by the 'split_by_4' column if not None.
-            if split_by_4 is not None:
-                # We'll melt on ["date", split_by_4], then "NMCTR external delay" and "Total external delay days" become lines
-                df_melted_4 = chart_data_4.melt(
-                    id_vars=["date", split_by_4],
-                    value_vars=["NMCTR external delay", "Total external delay days"],
-                    var_name="variable",
-                    value_name="value"
+                # single mean
+                baseline_means_4 = {
+                    "NMCTR external delay": baseline_4["NMCTR external delay"].mean() if not baseline_4.empty else 0,
+                    "Total external delay days": baseline_4["Total external delay days"].mean() if not baseline_4.empty else 0
+                }
+
+        # If no split, show the metrics
+        if split_by_4 is None and not chart_data_4.empty:
+            latest_nmctr, prev_nmctr = get_latest_and_previous_values(chart_data_4["NMCTR external delay"])
+            latest_total, prev_total = get_latest_and_previous_values(chart_data_4["Total external delay days"])
+            c7, c8 = st.columns(2)
+            with c7:
+                st.metric(
+                    label="NMCTR External Delay (Latest vs Previous)",
+                    value=float(round(latest_nmctr, 1)),
+                    delta=float(round(latest_nmctr - prev_nmctr, 1)),
                 )
-                fig4 = px.line(
-                    df_melted_4,
-                    x="date",
-                    y="value",
-                    color=split_by_4,         # each site/borough/pathway a separate color
-                    line_group=split_by_4,    # so each group gets its own line
-                    facet_row="variable",     # optionally separate subplots for each variable
-                    # or you could keep them in the same axis if you prefer
+            with c8:
+                st.metric(
+                    label="Total External Delay Days (Latest vs Previous)",
+                    value=float(round(latest_total, 1)),
+                    delta=float(round(latest_total - prev_total, 1)),
                 )
-                # (Add your trendline/baseline logic here if desired for each group)
-            else:
-                # Single total line for each column
-                df_melted_4 = chart_data_4.melt(
-                    id_vars=["date"],
-                    value_vars=["NMCTR external delay", "Total external delay days"],
-                    var_name="variable",
-                    value_name="value"
-                )
-                fig4 = px.line(
-                    df_melted_4,
-                    x="date",
-                    y="value",
-                    color="variable"
-                )
-                # Add optional trendlines / baseline lines
-                # (Use your existing 'create_line_chart' helper if you want!)
-        
-            st.plotly_chart(fig4, use_container_width=True)
-        
-            # ------------------------------------------------
-            # CHART 5: Average External Delay Days per Patient
-            # ------------------------------------------------
-            st.subheader("Average External Delay Days per Patient")
-        
-            with st.expander("Chart Settings for Average Delay"):
-                split_option_5 = st.radio(
-                    "Split By:",
-                    ["None", "site", "Borough", "Pathway"],
-                    index=0,
-                    key="ext_split_5"
-                )
-                show_trend_5 = st.checkbox("Show Trendline", value=False, key="ext_trend_5")
-                show_baseline_5 = st.checkbox("Show Baseline", value=False, key="ext_base_5")
-        
-            split_by_5 = None if split_option_5 == "None" else split_option_5
-        
-            chart_data_5 = aggregate_chart_data(
-                filtered_data2,
-                frequency,
-                chart_id=5,  # <--- new ratio chart
-                split_by=split_by_5
+
+        # Plot chart 4
+        # If splitted, we plot multiple lines. If not, we can do a standard multi-line.
+        if split_by_4 is not None and split_by_4 in chart_data_4.columns:
+            # Melt on ["date", split_by_4]
+            df_melted_4 = chart_data_4.melt(
+                id_vars=["date", split_by_4],
+                value_vars=["NMCTR external delay", "Total external delay days"],
+                var_name="variable",
+                value_name="value"
             )
-        
-            # Baseline means for chart 5
-            baseline_means_5 = None
-            if use_baseline and show_baseline_5:
-                baseline_5 = aggregate_chart_data(baseline_data2, frequency, chart_id=5, split_by=split_by_5)
-                # If splitted, each group can have a different mean
+            # We'll do a single-axis line chart with color=split_by_4 and facet_row="variable", for example:
+            fig4 = px.line(
+                df_melted_4,
+                x="date",
+                y="value",
+                color=split_by_4,
+                line_group=split_by_4,
+                facet_row="variable",
+            )
+            # You could add baseline lines/trendlines per group if you want
+            # (would require custom code to loop each group).
+        else:
+            # Single grouping => 2 lines: NMCTR vs Total
+            df_melted_4 = chart_data_4.melt(
+                id_vars=["date"],
+                value_vars=["NMCTR external delay", "Total external delay days"],
+                var_name="variable",
+                value_name="value"
+            )
+            fig4 = px.line(
+                df_melted_4,
+                x="date",
+                y="value",
+                color="variable"
+            )
+            # (Add trendline & baseline lines if desired, using a custom function)
+            # For example, a quick approach is to replicate the logic from create_line_chart:
+            # We'll just keep it simple here.
+
+        fig4.update_layout(
+            template="plotly_white",
+            font=dict(size=14),
+            margin=dict(l=0, r=0, t=40, b=0),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="left",
+                x=0.05
+            )
+        )
+        st.plotly_chart(fig4, use_container_width=True)
+
+        # ------------------------------------------------
+        # CHART 5: Average External Delay Days per Patient
+        # ------------------------------------------------
+        suffix = " (ratio of sums)" if frequency == "weekly" else " (daily ratio)"
+        st.subheader(f"Average External Delay Days per Patient{suffix}")
+
+        with st.expander("Chart Settings (Avg External Delays)"):
+            split_option_5 = st.radio(
+                "Split By:",
+                ["None", "site", "Borough", "Pathway"],
+                index=0,
+                key="ext_split_5"
+            )
+            show_trend_5 = st.checkbox("Show Trendline", value=False, key="ext_trend_5")
+            show_baseline_5 = st.checkbox("Show Baseline", value=False, key="ext_base_5")
+
+        split_by_5 = None if split_option_5 == "None" else split_option_5
+
+        chart_data_5 = aggregate_chart_data(
+            filtered_data2,
+            frequency,
+            chart_id=5,
+            split_by=split_by_5
+        )
+
+        # Baseline logic for chart 5
+        baseline_means_5 = None
+        if use_baseline and show_baseline_5:
+            baseline_5 = aggregate_chart_data(baseline_data2, frequency, chart_id=5, split_by=split_by_5)
+            if not baseline_5.empty:
                 if split_by_5 is not None and split_by_5 in baseline_5.columns:
+                    # multiple groups => store means in a dict
                     baseline_means_5 = {}
                     for grp, subdf in baseline_5.groupby(split_by_5):
                         baseline_means_5[grp] = subdf["average_delay_days"].mean()
                 else:
+                    # single grouping
                     baseline_means_5 = baseline_5["average_delay_days"].mean()
-        
-            # If not splitting, we can show the standard "Latest vs Previous"
-            if split_by_5 is None:
-                latest_avg, prev_avg = get_latest_and_previous_values(chart_data_5["average_delay_days"])
-                st.metric(
-                    label="Average Delay (Latest vs Previous)",
-                    value=float(round(latest_avg, 2)),
-                    delta=float(round(latest_avg - prev_avg, 2))
-                )
-        
-            # Create the chart
-            if split_by_5 is not None:
-                # We'll have multiple lines, one per group
-                fig5 = px.line(
-                    chart_data_5,
-                    x="date",
-                    y="average_delay_days",
-                    color=split_by_5,
-                    line_group=split_by_5
-                )
-            else:
-                # Single line
-                fig5 = px.line(
-                    chart_data_5,
-                    x="date",
-                    y="average_delay_days"
-                )
-            # (Add your code for trendlines and baseline lines if desired.)
-        
-            st.plotly_chart(fig5, use_container_width=True)
 
+        # If no split, we can show metrics
+        if split_by_5 is None and not chart_data_5.empty:
+            latest_avg, prev_avg = get_latest_and_previous_values(chart_data_5["average_delay_days"])
+            st.metric(
+                label="Average Delay (Latest vs Previous)",
+                value=float(round(latest_avg, 2)),
+                delta=float(round(latest_avg - prev_avg, 2))
+            )
+
+        # Build the chart
+        if split_by_5 is not None and split_by_5 in chart_data_5.columns:
+            fig5 = px.line(
+                chart_data_5,
+                x="date",
+                y="average_delay_days",
+                color=split_by_5,
+                line_group=split_by_5
+            )
+        else:
+            # Single line
+            fig5 = px.line(
+                chart_data_5,
+                x="date",
+                y="average_delay_days"
+            )
+
+        # If you want to add trendline/baseline manually, do it similarly to the approach in create_line_chart().
+        # We'll keep it short here:
+        fig5.update_layout(
+            template="plotly_white",
+            font=dict(size=14),
+            margin=dict(l=0, r=0, t=40, b=0),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="left",
+                x=0.05
+            )
+        )
+        st.plotly_chart(fig5, use_container_width=True)
+
+
+# ================================================
+# TAB 2: DPTL METRICS (placeholder)
+# ================================================
 with tab2:
     st.write("DPTL Metrics content goes here.")
