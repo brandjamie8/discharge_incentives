@@ -220,9 +220,9 @@ def create_line_chart(
     if baseline_texts:
         annotation_text = "Baseline Means:<br>" + "<br>".join(baseline_texts)
         fig.add_annotation(
-            x=1, y=1,
+            x=0, y=1,
             xref="paper", yref="paper",
-            xanchor="right", yanchor="top",
+            xanchor="left", yanchor="top",
             text=annotation_text,
             showarrow=False,
             bordercolor="black",
