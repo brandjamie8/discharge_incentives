@@ -372,6 +372,16 @@ st.set_page_config(page_title="LGT Discharge Incentives Dashboard", layout="wide
 st.title("Discharge Incentives Monitoring")
 
 # -- Sidebar --
+
+st.sidebar.markdown("""
+### Metrics:
+- [Admissions & Discharges](#admissions)
+- [21+ LoS & 14+ LoS](#los)
+- [Escalation & Boarded Beds](#beds)
+- [External Delays](#external-delays)
+- [Average Delay Per Patient](#avg-delay)
+""", unsafe_allow_html=True)
+
 st.sidebar.header("Filters & Settings")
 df = load_data()
 df2 = load_external_delay_data()  # second dataset for external delays
@@ -456,6 +466,7 @@ with tab1:
         # CHART 1: Admissions & Discharges
         # ------------------------------------------------
         suffix = " (weekly total)" if frequency == "weekly" else " (daily)"
+        st.markdown("<h2 id='admissions'>Admissions and Discharges</h2>", unsafe_allow_html=True)
         st.subheader(f"Admissions and Discharges{suffix}")
 
         chart_data_1 = aggregate_chart_data(filtered_data, frequency, chart_id=1)
@@ -506,6 +517,7 @@ with tab1:
         # ------------------------------------------------
         # CHART 2: 21+ LoS & 14+ LoS
         # ------------------------------------------------
+        st.markdown("<h2 id='los'>21+ LoS and 14+ LoS</h2>", unsafe_allow_html=True)
         suffix = " (avg per day)" if frequency == "weekly" else " (daily)"
         st.subheader(f"21+ LoS and 14+ LoS{suffix}")
 
@@ -560,6 +572,7 @@ with tab1:
         # ------------------------------------------------
         # CHART 3: Escalation & Boarded Beds
         # ------------------------------------------------
+        st.markdown("<h2 id='beds'>Escalation & Boarded Beds</h2>", unsafe_allow_html=True)
         suffix = " (avg per day)" if frequency == "weekly" else " (daily)"
         st.subheader(f"Escalation & Boarded Beds{suffix}")
 
@@ -630,6 +643,7 @@ with tab1:
         # ------------------------------------------------
         # CHART 4: External Delay (NMCTR & Total)
         # ------------------------------------------------
+        st.markdown("<h2 id='external-delays'>External Delays</h2>", unsafe_allow_html=True)
         suffix = " (avg per day)" if frequency == "weekly" else " (daily)"
         st.subheader(f"External Delays{suffix}")
 
@@ -737,6 +751,7 @@ with tab1:
         # ------------------------------------------------
         # CHART 5: Average External Delay Days per Patient
         # ------------------------------------------------
+        st.markdown("<h2 id='avg-delay'>Average External Delay Days per Patient</h2>", unsafe_allow_html=True)
         suffix = " (ratio of sums)" if frequency == "weekly" else " (daily ratio)"
         st.subheader(f"Average External Delay Days per Patient{suffix}")
 
