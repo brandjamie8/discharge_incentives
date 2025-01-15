@@ -638,7 +638,7 @@ with tab1:
         with st.expander("Chart Settings"):
             split_option_4 = st.radio(
                 "Split By:",
-                ["None", "site", "Borough", "Pathway"],
+                ["None", "Site", "Borough", "Pathway"],
                 index=0,
                 key="ext_split_4"
             )
