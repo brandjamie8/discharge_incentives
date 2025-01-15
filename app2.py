@@ -431,14 +431,14 @@ with tab1:
         with c3:
             st.metric(
                 label="21+ LoS (Latest vs Previous)",
-                value=round(latest_21plus, 1),
-                delta=round(latest_21plus - prev_21plus, 1),
+                value=float(round(latest_21plus, 1)),
+                delta=float(round(latest_21plus - prev_21plus, 1)),
             )
         with c4:
             st.metric(
                 label="14+ LoS (Latest vs Previous)",
-                value=round(latest_14plus, 1),
-                delta=round(latest_14plus - prev_14plus, 1),
+                value=float(round(latest_14plus, 1)),
+                delta=float(round(latest_14plus - prev_14plus, 1)),
             )
 
         with st.expander("Chart Settings"):
@@ -476,14 +476,14 @@ with tab1:
         with c5:
             st.metric(
                 label="Escalation Beds (Latest vs Previous)",
-                value=round(latest_esc, 1),
-                delta=round(latest_esc - prev_esc, 1),
+                value=float(round(latest_esc, 1)),
+                delta=float(round(latest_esc - prev_esc, 1)),
             )
         with c6:
             st.metric(
                 label="Boarded Beds (Latest vs Previous)",
-                value=round(latest_boarded, 1),
-                delta=round(latest_boarded - prev_boarded, 1),
+                value=float(round(latest_boarded, 1)),
+                delta=float(round(latest_boarded - prev_boarded, 1)),
             )
 
         with st.expander("Chart Settings"):
