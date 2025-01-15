@@ -633,7 +633,7 @@ with tab1:
         suffix = " (avg per day)" if frequency == "weekly" else " (daily)"
         st.subheader(f"External Delays{suffix}")
 
-        with st.expander("Chart Settings (External Delays)"):
+        with st.expander("Chart Settings"):
             split_option_4 = st.radio(
                 "Split By:",
                 ["None", "site", "Borough", "Pathway"],
@@ -658,36 +658,27 @@ with tab1:
             baseline_4 = aggregate_chart_data(baseline_data2, frequency, chart_id=4, split_by=split_by_4)
             # For multi-group, you'd have to compute means per group:
             if split_by_4 is not None and split_by_4 in baseline_4.columns:
-                # e.g. { "NMCTR external delay": {group: mean}, "Total external delay days": {group: mean} }
+                # e.g. { "NMCTR external delay": {group: mean}}
                 baseline_means_4 = {}
                 for col in ["NMCTR external delay", "Total external delay days"]:
                     baseline_means_4[col] = {}
                 for grp, subdf in baseline_4.groupby(split_by_4):
                     baseline_means_4["NMCTR external delay"][grp] = subdf["NMCTR external delay"].mean()
-                    baseline_means_4["Total external delay days"][grp] = subdf["Total external delay days"].mean()
             else:
                 # single mean
                 baseline_means_4 = {
                     "NMCTR external delay": baseline_4["NMCTR external delay"].mean() if not baseline_4.empty else 0,
-                    "Total external delay days": baseline_4["Total external delay days"].mean() if not baseline_4.empty else 0
                 }
 
         # If no split, show the metrics
         if split_by_4 is None and not chart_data_4.empty:
             latest_nmctr, prev_nmctr = get_latest_and_previous_values(chart_data_4["NMCTR external delay"])
-            latest_total, prev_total = get_latest_and_previous_values(chart_data_4["Total external delay days"])
             c7, c8 = st.columns(2)
             with c7:
                 st.metric(
                     label="NMCTR External Delay (Latest vs Previous)",
                     value=float(round(latest_nmctr, 1)),
                     delta=float(round(latest_nmctr - prev_nmctr, 1)),
-                )
-            with c8:
-                st.metric(
-                    label="Total External Delay Days (Latest vs Previous)",
-                    value=float(round(latest_total, 1)),
-                    delta=float(round(latest_total - prev_total, 1)),
                 )
 
         # Plot chart 4
@@ -696,7 +687,7 @@ with tab1:
             # Melt on ["date", split_by_4]
             df_melted_4 = chart_data_4.melt(
                 id_vars=["date", split_by_4],
-                value_vars=["NMCTR external delay", "Total external delay days"],
+                value_vars=["NMCTR external delay"],
                 var_name="variable",
                 value_name="value"
             )
@@ -715,7 +706,7 @@ with tab1:
             # Single grouping => 2 lines: NMCTR vs Total
             df_melted_4 = chart_data_4.melt(
                 id_vars=["date"],
-                value_vars=["NMCTR external delay", "Total external delay days"],
+                value_vars=["NMCTR external delay"],
                 var_name="variable",
                 value_name="value"
             )
