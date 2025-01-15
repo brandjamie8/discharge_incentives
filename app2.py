@@ -439,13 +439,6 @@ else:
     baseline_data = pd.DataFrame()
     baseline_data2 = pd.DataFrame()
 
-st.sidebar.download_button(
-    label="Download Data",
-    data=filtered_data.to_csv(index=False),
-    file_name="discharge_data.csv",
-    mime="text/csv"
-)
-
 import io
 
 # Create a BytesIO buffer
@@ -461,7 +454,7 @@ excel_bytes = output.getvalue()
 
 # Provide a download button for the Excel file with two sheets
 st.sidebar.download_button(
-    label="Download Data (Excel with 2 sheets)",
+    label="Download Data",
     data=excel_bytes,
     file_name="data_extract.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
