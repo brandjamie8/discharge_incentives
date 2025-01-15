@@ -740,7 +740,7 @@ with tab1:
         suffix = " (ratio of sums)" if frequency == "weekly" else " (daily ratio)"
         st.subheader(f"Average External Delay Days per Patient{suffix}")
 
-        with st.expander("Chart Settings (Avg External Delays)"):
+        with st.expander("Chart Settings"):
             split_option_5 = st.radio(
                 "Split By:",
                 ["None", "site", "Borough", "Pathway"],
