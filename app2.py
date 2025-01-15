@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
+import plotly.graph_objects as go
 import datetime
 
 # -----------------------
@@ -10,10 +12,10 @@ import datetime
 def load_data():
     """Load and prepare the CSV data."""
     df = pd.read_csv("data/SitrepData.csv")
+    # Convert date column
     df["date"] = pd.to_datetime(df["date"], format="%d/%m/%Y", errors="coerce")
     df.sort_values("date", inplace=True)
     return df
-
 
 # -----------------------
 # Determine Default Date Range
@@ -36,7 +38,6 @@ def get_default_date_range(df, freq):
         last_monday = max_date - datetime.timedelta(days=max_date.weekday())
         # 26 weeks ago from that Monday
         start_date = last_monday - datetime.timedelta(weeks=25)
-        # We show up to the day before the next Monday
         end_date = last_monday - datetime.timedelta(days=1)
     else:
         # 'daily' => last 30 days
@@ -56,11 +57,9 @@ def get_default_date_range(df, freq):
 # -----------------------
 def daily_or_weekly(df, freq, agg_map):
     """
-    1) First, aggregate all rows for each date into a single row,
-       combining data for all selected sites on that date using `agg_map`.
-    2) If freq == 'daily', return the daily-aggregated DataFrame.
-    3) If freq == 'weekly', resample that daily dataframe by W-MON (Monday start),
-       and apply the same aggregation map.
+    1) Aggregate all rows for each date into a single row.
+    2) If freq == 'daily', return the daily-aggregated dataframe.
+    3) If freq == 'weekly', resample the daily dataframe by W-MON, etc.
     """
     if df.empty:
         return df
@@ -93,10 +92,30 @@ def daily_or_weekly(df, freq, agg_map):
 # -----------------------
 def create_line_chart(data, x_col, y_cols, color_map=None, labels=None, show_trendline=False):
     """
-    Creates a line chart with optional dotted OLS trend lines in the same color,
-    while still connecting data points with lines.
+    Create a multi-line chart using px.line(), optionally adding
+    a dotted OLS best-fit line for each metric in the same color.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        DataFrame with one row per date (aggregated).
+    x_col : str
+        The name of the x-axis column (e.g., "date").
+    y_cols : list
+        List of columns to be plotted on the y-axis.
+    color_map : dict
+        Optional dict mapping each y_col to a color, e.g. {"admissions": "#1f77b4"}.
+    labels : dict
+        Custom axis labels, e.g. {"value": "Patients", "variable": "Metric"}.
+    show_trendline : bool
+        If True, compute & add a dotted best-fit line for each y_col.
+
+    Returns
+    -------
+    fig : plotly.graph_objects.Figure
     """
-    # Melt data so each y_col is identified by "variable"
+
+    # Melt data for px.line usage
     df_melted = data.melt(
         id_vars=[x_col],
         value_vars=y_cols,
@@ -104,55 +123,70 @@ def create_line_chart(data, x_col, y_cols, color_map=None, labels=None, show_tre
         value_name="value"
     )
 
-    # Build color sequence from color_map if provided
+    # Build a color mapping for each variable
     if color_map:
-        # Order color sequence to match y_cols
-        color_sequence = [color_map.get(col, "#000000") for col in y_cols]
+        color_discrete_map = {var: color_map.get(var, "#000000") for var in y_cols}
     else:
-        # fallback color palette
-        color_sequence = px.colors.qualitative.Plotly
+        # fallback: Let px pick
+        color_discrete_map = {}
 
+    # 1) Base line chart
+    fig = px.line(
+        df_melted,
+        x=x_col,
+        y="value",
+        color="variable",
+        color_discrete_map=color_discrete_map,
+        labels=labels
+    )
+    
+    # Thicker lines
+    fig.update_traces(line=dict(width=3))
+
+    # 2) If show_trendline, add a separate dotted line for each variable
     if show_trendline:
-        # Plot with OLS trend lines
-        fig = px.scatter(
-            df_melted,
-            x=x_col,
-            y="value",
-            color="variable",
-            trendline="ols",
-            trendline_scope="trace",  # one trend line per variable
-            color_discrete_sequence=color_sequence,
-            labels=labels
-        )
-        # 1) Connect data points with lines (remove the scatter markers)
-        fig.update_traces(
-            mode="lines",
-            selector=lambda trace: "variable=" in trace.legendgroup
-        )
-        # 2) Thicker lines for main data
-        fig.update_traces(
-            line=dict(width=3),
-            selector=lambda trace: "variable=" in trace.legendgroup
-        )
-        # 3) Dotted trend lines (same color)
-        fig.update_traces(
-            line=dict(dash="dot", width=2),
-            selector=lambda trace: "trendline" in trace.name.lower()
-        )
-    else:
-        # Normal line chart
-        fig = px.line(
-            df_melted,
-            x=x_col,
-            y="value",
-            color="variable",
-            color_discrete_sequence=color_sequence,
-            labels=labels
-        )
-        # Thicker lines
-        fig.update_traces(line=dict(width=3))
+        for var in y_cols:
+            df_var = df_melted[df_melted["variable"] == var].dropna(subset=["value"])
+            if df_var.empty:
+                continue
+            
+            # Convert date to ordinal for polyfit
+            # (because np.polyfit needs numeric x)
+            x_ord = df_var[x_col].apply(lambda d: d.toordinal()).values
+            y_vals = df_var["value"].values
+            
+            if len(x_ord) < 2:
+                # Not enough points for regression
+                continue
 
-    # Larger text, consistent layout
+            # Fit a linear model y = m*x + c
+            slope, intercept = np.polyfit(x_ord, y_vals, 1)
+
+            # Generate a "smooth" line of best fit
+            x_min, x_max = x_ord.min(), x_ord.max()
+            x_fit = np.linspace(x_min, x_max, 50)
+            y_fit = slope * x_fit + intercept
+
+            # Convert back to datetime
+            dt_fit = [datetime.date.fromordinal(int(xi)) for xi in x_fit]
+
+            # Add as a new trace
+            fig.add_trace(
+                go.Scatter(
+                    x=dt_fit,
+                    y=y_fit,
+                    mode="lines",
+                    name=f"{var} Trend",
+                    line=dict(
+                        dash="dot",
+                        width=2,
+                        color=color_discrete_map.get(var, "#000000")
+                    ),
+                    showlegend=False  # or True if you want a separate legend entry
+                )
+            )
+
+    # Larger text & consistent layout
     fig.update_layout(
         template="plotly_white",
         font=dict(size=14),
@@ -170,7 +204,7 @@ def create_line_chart(data, x_col, y_cols, color_map=None, labels=None, show_tre
 
 def create_stacked_bar_chart(data, x_col, y_cols, color_map=None, labels=None):
     """
-    Creates a stacked bar chart (with larger text).
+    Creates a stacked bar chart with larger text.
     """
     df_melted = data.melt(
         id_vars=[x_col],
@@ -180,9 +214,9 @@ def create_stacked_bar_chart(data, x_col, y_cols, color_map=None, labels=None):
     )
 
     if color_map:
-        color_sequence = [color_map.get(col, "#000000") for col in y_cols]
+        color_discrete_map = {var: color_map.get(var, "#000000") for var in y_cols}
     else:
-        color_sequence = px.colors.qualitative.Plotly
+        color_discrete_map = {}
 
     fig = px.bar(
         df_melted,
@@ -190,7 +224,7 @@ def create_stacked_bar_chart(data, x_col, y_cols, color_map=None, labels=None):
         y="value",
         color="variable",
         barmode="stack",
-        color_discrete_sequence=color_sequence,
+        color_discrete_map=color_discrete_map,
         labels=labels
     )
     fig.update_layout(
@@ -270,6 +304,7 @@ selected_sites = st.sidebar.multiselect("Select Site(s)", all_sites, default=all
 
 filtered_data = filtered_data[ filtered_data["site"].isin(selected_sites) ]
 
+# Download button
 st.sidebar.download_button(
     label="Download Data",
     data=filtered_data.to_csv(index=False),
@@ -281,7 +316,7 @@ st.sidebar.download_button(
 tab1, tab2 = st.tabs(["Daily Sitrep Metrics", "DPTL Metrics"])
 
 with tab1:
-    _, col1, col2 = st.columns([1,10,1])
+    _, col1, _ = st.columns([1,10,1])
     
     with col1:
         # ---------------------------------------
@@ -290,10 +325,7 @@ with tab1:
         suffix = " (weekly total)" if frequency == "weekly" else " (daily)"
         st.subheader(f"Admissions and Discharges{suffix}")
         
-        agg_map_adm = {
-            "admissions": "sum",
-            "discharges": "sum"
-        }
+        agg_map_adm = {"admissions": "sum", "discharges": "sum"}
         chart_data_1 = daily_or_weekly(filtered_data, frequency, agg_map_adm)
 
         # Metric cards
@@ -313,15 +345,16 @@ with tab1:
                 value=int(latest_dis),
                 delta=int(latest_dis - prev_dis),
             )
-        
+
+        # Toggle trendline
         show_trend_1 = st.radio(
             "Show Trendline (Admissions & Discharges)?",
             ["No", "Yes"],
             index=0
         )
         color_map_1 = {
-            "admissions": "#006cb5",
-            "discharges": "#f5136f"
+            "admissions": "#1f77b4",
+            "discharges": "#ff7f0e"
         }
         fig1 = create_line_chart(
             data=chart_data_1,
@@ -412,7 +445,6 @@ with tab1:
                 delta=round(latest_boarded - prev_boarded, 1),
             )
         
-        # Stacked bar chart
         color_map_3 = {
             "escalation beds": "#2ca02c",
             "boarded beds": "#d62728"
@@ -425,7 +457,6 @@ with tab1:
             labels={"value": "Beds", "variable": "Bed Type"}
         )
         st.plotly_chart(fig3, use_container_width=True)
-
 
 with tab2:
     st.write("DPTL Metrics content goes here.")
