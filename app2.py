@@ -24,7 +24,6 @@ def load_external_delay_data():
     df2.sort_values("date", inplace=True)
     return df2
 
-
 # --------------------------------------
 # Determine Default Date Range
 # --------------------------------------
@@ -56,9 +55,8 @@ def get_default_date_range(df, freq):
 
     return start_date, end_date
 
-
 # --------------------------------------
-# Aggregation Logic (Supports chart_id=1..5 and split_by)
+# Aggregation Logic (Supports chart_id=1..6 and split_by)
 # --------------------------------------
 def aggregate_chart_data(df, frequency, chart_id, split_by=None):
     """
@@ -78,6 +76,9 @@ def aggregate_chart_data(df, frequency, chart_id, split_by=None):
       - chart_id=5 => Average External Delay Days per Patient
            * daily => ratio of sums => sum(Total)/sum(NMCTR)
            * weekly => ratio of sums => sum(Total)/sum(NMCTR)
+      - chart_id=6 => Total External Delay Days
+           * daily => sum
+           * weekly => sum (weekly total)
 
     'split_by' can be None, 'site', 'Borough', or 'Pathway'.
     """
@@ -212,10 +213,8 @@ def aggregate_chart_data(df, frequency, chart_id, split_by=None):
                         .reset_index()
             )
 
-    
     daily_df.reset_index(drop=True, inplace=True)
     return weekly_df.reset_index(drop=True)
-
 
 # --------------------------------------
 # Helper: Return latest & previous values
@@ -232,7 +231,6 @@ def get_latest_and_previous_values(series):
         return series.iloc[-1], 0
     else:
         return series.iloc[-1], series.iloc[-2]
-
 
 # --------------------------------------
 # Chart Creation (for the first 3 charts)
@@ -348,7 +346,6 @@ def create_line_chart(
     )
     return fig
 
-
 def create_stacked_bar_chart(data, x_col, y_cols, color_map=None, labels=None):
     df_melted = data.melt(
         id_vars=[x_col],
@@ -384,7 +381,6 @@ def create_stacked_bar_chart(data, x_col, y_cols, color_map=None, labels=None):
     )
     return fig
 
-
 # --------------------------------------
 # Streamlit Layout
 # --------------------------------------
@@ -392,8 +388,6 @@ st.set_page_config(page_title="LGT Discharge Incentives Dashboard", layout="wide
 st.title("Discharge Incentives Monitoring")
 
 # -- Sidebar --
-
-
 st.sidebar.header("Filters & Settings")
 df = load_data()
 df2 = load_external_delay_data()  # second dataset for external delays
@@ -459,6 +453,15 @@ else:
     baseline_data = pd.DataFrame()
     baseline_data2 = pd.DataFrame()
 
+# --- NEW: Change Date option (appears below Baseline and above Download) ---
+st.sidebar.subheader("Change Date")
+use_change_date = st.sidebar.checkbox("Define a change date?", value=False)
+if use_change_date:
+    change_date = st.sidebar.date_input("Select change date (for marker):")
+else:
+    change_date = None
+
+# --- Move the Download Data button to the BOTTOM of the sidebar ---
 import io
 
 # Create a BytesIO buffer
@@ -472,7 +475,7 @@ with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
 # Get the Excel file bytes
 excel_bytes = output.getvalue()
 
-# Provide a download button for the Excel file with two sheets
+# (The download button is placed at the bottom of the sidebar.)
 st.sidebar.download_button(
     label="Download Data",
     data=excel_bytes,
@@ -516,6 +519,10 @@ with tab1:
         with st.expander("Chart Settings"):
             show_trend_1 = st.checkbox("Show Trendline", value=False, key="adm_dis_trend")
             show_baseline_1 = st.checkbox("Show Baseline", value=False, key="adm_dis_base")
+            if use_change_date:
+                show_change_line_1 = st.checkbox("Show Change Date Marker", value=False, key="change_marker_1")
+            else:
+                show_change_line_1 = False
 
         baseline_means_1 = None
         if use_baseline and show_baseline_1:
@@ -537,6 +544,15 @@ with tab1:
             show_baseline=show_baseline_1,
             baseline_means=baseline_means_1
         )
+        if use_change_date and show_change_line_1 and change_date:
+            fig1.add_vline(
+                x=pd.to_datetime(change_date),
+                line_width=2,
+                line_dash="dot",
+                line_color="#7FFFD4",
+                annotation_text=str(change_date),
+                annotation_position="top left"
+            )
         st.plotly_chart(fig1, use_container_width=True)
 
         # ------------------------------------------------
@@ -567,6 +583,10 @@ with tab1:
         with st.expander("Chart Settings"):
             show_trend_2 = st.checkbox("Show Trendline", value=False, key="los_trend")
             show_baseline_2 = st.checkbox("Show Baseline", value=False, key="los_base")
+            if use_change_date:
+                show_change_line_2 = st.checkbox("Show Change Date Marker", value=False, key="change_marker_2")
+            else:
+                show_change_line_2 = False
 
         baseline_means_2 = None
         if use_baseline and show_baseline_2:
@@ -591,6 +611,15 @@ with tab1:
             show_baseline=show_baseline_2,
             baseline_means=baseline_means_2
         )
+        if use_change_date and show_change_line_2 and change_date:
+            fig2.add_vline(
+                x=pd.to_datetime(change_date),
+                line_width=2,
+                line_dash="dot",
+                line_color="#7FFFD4",
+                annotation_text=str(change_date),
+                annotation_position="top left"
+            )
         st.plotly_chart(fig2, use_container_width=True)
 
         # ------------------------------------------------
@@ -627,6 +656,10 @@ with tab1:
                 index=0,
                 key="beds_chart_type"
             )
+            if use_change_date:
+                show_change_line_3 = st.checkbox("Show Change Date Marker", value=False, key="change_marker_3")
+            else:
+                show_change_line_3 = False
 
         baseline_means_3 = None
         if use_baseline and show_baseline_3:
@@ -660,6 +693,15 @@ with tab1:
                 y_cols=["escalation beds", "boarded beds"],
                 color_map=color_map_3,
                 labels={"value": "Beds", "variable": "Bed Type"}
+            )
+        if use_change_date and show_change_line_3 and change_date:
+            fig3.add_vline(
+                x=pd.to_datetime(change_date),
+                line_width=2,
+                line_dash="dot",
+                line_color="#7FFFD4",
+                annotation_text=str(change_date),
+                annotation_position="top left"
             )
         st.plotly_chart(fig3, use_container_width=True)
 
@@ -695,6 +737,10 @@ with tab1:
                 index=0,
                 key="ext_split_4"
             )
+            if use_change_date:
+                show_change_line_4 = st.checkbox("Show Change Date Marker", value=False, key="change_marker_4")
+            else:
+                show_change_line_4 = False
         
         # -- Filter the data2 for the chosen boroughs & pathways
         filtered_data2_ext = filtered_data2[
@@ -736,7 +782,7 @@ with tab1:
             f"**Pathway** = {', '.join(selected_pathways)}"
         )
         st.markdown(filters_msg_4)
-
+        
         # -- Plot chart 4
         if split_by_4 is not None and split_by_4 in chart_data_4.columns:
             # Splitting => multiple lines
@@ -781,6 +827,15 @@ with tab1:
             )
         )
         fig4.update_traces(line=dict(width=3))
+        if use_change_date and show_change_line_4 and change_date:
+            fig4.add_vline(
+                x=pd.to_datetime(change_date),
+                line_width=2,
+                line_dash="dot",
+                line_color="#7FFFD4",
+                annotation_text=str(change_date),
+                annotation_position="top left"
+            )
         st.plotly_chart(fig4, use_container_width=True)
         
         # ------------------------------------------------
@@ -814,6 +869,10 @@ with tab1:
                 index=0,
                 key="ext_split_5"
             )
+            if use_change_date:
+                show_change_line_5 = st.checkbox("Show Change Date Marker", value=False, key="change_marker_5")
+            else:
+                show_change_line_5 = False
         
         # Filter
         filtered_data2_avg = filtered_data2[
@@ -882,6 +941,15 @@ with tab1:
             )
         )
         fig5.update_traces(line=dict(width=3))
+        if use_change_date and show_change_line_5 and change_date:
+            fig5.add_vline(
+                x=pd.to_datetime(change_date),
+                line_width=2,
+                line_dash="dot",
+                line_color="#7FFFD4",
+                annotation_text=str(change_date),
+                annotation_position="top left"
+            )
         st.plotly_chart(fig5, use_container_width=True)
 
         # ------------------------------------------------
@@ -915,6 +983,10 @@ with tab1:
                 index=0,
                 key="ext_split_6"
             )
+            if use_change_date:
+                show_change_line_6 = st.checkbox("Show Change Date Marker", value=False, key="change_marker_6")
+            else:
+                show_change_line_6 = False
         
         # Filter the External Delays data for the new chart
         filtered_data2_total = filtered_data2[
@@ -982,5 +1054,13 @@ with tab1:
             )
         )
         fig6.update_traces(line=dict(width=3))
+        if use_change_date and show_change_line_6 and change_date:
+            fig6.add_vline(
+                x=pd.to_datetime(change_date),
+                line_width=2,
+                line_dash="dot",
+                line_color="#7FFFD4",
+                annotation_text=str(change_date),
+                annotation_position="top left"
+            )
         st.plotly_chart(fig6, use_container_width=True)
-
