@@ -545,20 +545,22 @@ with tab1:
         )
         if use_change_date and show_change_line_1 and change_date:
             x_val = pd.to_datetime(change_date)
+            formatted_date = change_date.strftime("%d-%b-%y")
             fig1.add_vline(
                 x=x_val,
                 line_width=2,
                 line_dash="dot",
-                line_color="#7FFFD4"
+                line_color="#00CC96"
             )
             fig1.add_annotation(
                 x=x_val,
-                y=1,
+                y=1.05,
                 xref="x",
                 yref="paper",
-                text=str(change_date),
+                text=formatted_date,
                 showarrow=False,
-                font=dict(color="#7FFFD4")
+                font=dict(color="#00CC96"),
+                yanchor="bottom"
             )
         st.plotly_chart(fig1, use_container_width=True)
 
@@ -620,20 +622,22 @@ with tab1:
         )
         if use_change_date and show_change_line_2 and change_date:
             x_val = pd.to_datetime(change_date)
+            formatted_date = change_date.strftime("%d-%b-%y")
             fig2.add_vline(
                 x=x_val,
                 line_width=2,
                 line_dash="dot",
-                line_color="#7FFFD4"
+                line_color="#00CC96"
             )
             fig2.add_annotation(
                 x=x_val,
-                y=1,
+                y=1.05,
                 xref="x",
                 yref="paper",
-                text=str(change_date),
+                text=formatted_date,
                 showarrow=False,
-                font=dict(color="#7FFFD4")
+                font=dict(color="#00CC96"),
+                yanchor="bottom"
             )
         st.plotly_chart(fig2, use_container_width=True)
 
@@ -711,20 +715,22 @@ with tab1:
             )
         if use_change_date and show_change_line_3 and change_date:
             x_val = pd.to_datetime(change_date)
+            formatted_date = change_date.strftime("%d-%b-%y")
             fig3.add_vline(
                 x=x_val,
                 line_width=2,
                 line_dash="dot",
-                line_color="#7FFFD4"
+                line_color="#00CC96"
             )
             fig3.add_annotation(
                 x=x_val,
-                y=1,
+                y=1.05,
                 xref="x",
                 yref="paper",
-                text=str(change_date),
+                text=formatted_date,
                 showarrow=False,
-                font=dict(color="#7FFFD4")
+                font=dict(color="#00CC96"),
+                yanchor="bottom"
             )
         st.plotly_chart(fig3, use_container_width=True)
 
@@ -852,20 +858,22 @@ with tab1:
         fig4.update_traces(line=dict(width=3))
         if use_change_date and show_change_line_4 and change_date:
             x_val = pd.to_datetime(change_date)
+            formatted_date = change_date.strftime("%d-%b-%y")
             fig4.add_vline(
                 x=x_val,
                 line_width=2,
                 line_dash="dot",
-                line_color="#7FFFD4"
+                line_color="#00CC96"
             )
             fig4.add_annotation(
                 x=x_val,
-                y=1,
+                y=1.05,
                 xref="x",
                 yref="paper",
-                text=str(change_date),
+                text=formatted_date,
                 showarrow=False,
-                font=dict(color="#7FFFD4")
+                font=dict(color="#00CC96"),
+                yanchor="bottom"
             )
         st.plotly_chart(fig4, use_container_width=True)
         
@@ -974,20 +982,22 @@ with tab1:
         fig5.update_traces(line=dict(width=3))
         if use_change_date and show_change_line_5 and change_date:
             x_val = pd.to_datetime(change_date)
+            formatted_date = change_date.strftime("%d-%b-%y")
             fig5.add_vline(
                 x=x_val,
                 line_width=2,
                 line_dash="dot",
-                line_color="#7FFFD4"
+                line_color="#00CC96"
             )
             fig5.add_annotation(
                 x=x_val,
-                y=1,
+                y=1.05,
                 xref="x",
                 yref="paper",
-                text=str(change_date),
+                text=formatted_date,
                 showarrow=False,
-                font=dict(color="#7FFFD4")
+                font=dict(color="#00CC96"),
+                yanchor="bottom"
             )
         st.plotly_chart(fig5, use_container_width=True)
 
@@ -1095,19 +1105,21 @@ with tab1:
         fig6.update_traces(line=dict(width=3))
         if use_change_date and show_change_line_6 and change_date:
             x_val = pd.to_datetime(change_date)
+            formatted_date = change_date.strftime("%d-%b-%y")
             fig6.add_vline(
                 x=x_val,
                 line_width=2,
                 line_dash="dot",
-                line_color="#7FFFD4"
+                line_color="#00CC96"
             )
             fig6.add_annotation(
                 x=x_val,
-                y=1,
+                y=1.05,
                 xref="x",
                 yref="paper",
-                text=str(change_date),
+                text=formatted_date,
                 showarrow=False,
-                font=dict(color="#7FFFD4")
+                font=dict(color="#00CC96"),
+                yanchor="bottom"
             )
         st.plotly_chart(fig6, use_container_width=True)
