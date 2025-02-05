@@ -96,6 +96,8 @@ def aggregate_chart_data(df, frequency, chart_id, split_by=None):
         needed_cols = ["NMCTR external delay", "Total external delay days"]
     elif chart_id == 5:
         needed_cols = ["NMCTR external delay", "Total external delay days"]
+    elif chart_id == 6:
+        needed_cols = ["Total external delay days"]
     else:
         # fallback
         needed_cols = df.columns.drop(["date", "site", "Borough", "Pathway"], errors="ignore")
@@ -193,6 +195,24 @@ def aggregate_chart_data(df, frequency, chart_id, split_by=None):
         )
         weekly_df = sum_df
 
+    elif chart_id == 6:
+        # For total delay days, we want the weekly sum (not the mean)
+        if split_by and split_by in df.columns:
+            weekly_df = (
+                daily_df.groupby(split_by)
+                        .resample("W-MON", label="left", closed="left")[needed_cols]
+                        .sum()
+                        .reset_index()
+            )
+        else:
+            weekly_agg_map = {col: "sum" for col in needed_cols}
+            weekly_df = (
+                daily_df.resample("W-MON", label="left", closed="left")
+                        .agg(weekly_agg_map)
+                        .reset_index()
+            )
+
+    
     daily_df.reset_index(drop=True, inplace=True)
     return weekly_df.reset_index(drop=True)
 
@@ -863,4 +883,104 @@ with tab1:
         )
         fig5.update_traces(line=dict(width=3))
         st.plotly_chart(fig5, use_container_width=True)
+
+        # ------------------------------------------------
+        # CHART 6: Total External Delay Days
+        # ------------------------------------------------
+        suffix = " (weekly total)" if frequency == "weekly" else " (daily)"
+        st.subheader(f"Total External Delay Days{suffix}")
+        
+        with st.expander("Chart Settings"):
+            # Borough & Pathway filters (similar to Chart 5)
+            st.write("**Filter by Borough and Pathway**")
+            available_boroughs_6 = sorted(filtered_data2["Borough"].dropna().unique())
+            selected_boroughs_6 = st.multiselect(
+                "Select Borough(s)",
+                options=available_boroughs_6,
+                default=available_boroughs_6,
+                key="ext_borough_6"
+            )
+            
+            available_pathways_6 = sorted(filtered_data2["Pathway"].dropna().unique())
+            selected_pathways_6 = st.multiselect(
+                "Select Pathway(s)",
+                options=available_pathways_6,
+                default=available_pathways_6,
+                key="ext_pathway_6"
+            )
+            
+            split_option_6 = st.radio(
+                "Split By:",
+                ["None", "Site", "Borough", "Pathway"],
+                index=0,
+                key="ext_split_6"
+            )
+        
+        # Filter the External Delays data for the new chart
+        filtered_data2_total = filtered_data2[
+            (filtered_data2["Borough"].isin(selected_boroughs_6)) &
+            (filtered_data2["Pathway"].isin(selected_pathways_6))
+        ]
+        
+        if split_option_6 == "None":
+            split_by_6 = None
+        elif split_option_6 == "Site":
+            split_by_6 = "site"
+        else:
+            split_by_6 = split_option_6  # "Borough" or "Pathway"
+        
+        # Use the new chart_id 6 to get total delay days data
+        chart_data_6 = aggregate_chart_data(
+            filtered_data2_total,
+            frequency,
+            chart_id=6,  # new chart for total delay days
+            split_by=split_by_6
+        )
+        
+        # If no split, display a single metric
+        if split_by_6 is None and not chart_data_6.empty:
+            latest_total, prev_total = get_latest_and_previous_values(chart_data_6["Total external delay days"])
+            st.metric(
+                label="Total Delay Days (Latest vs Previous)",
+                value=int(latest_total),
+                delta=int(latest_total - prev_total)
+            )
+            
+        filters_msg_6 = (
+            f"Filters applied: **Site** = {', '.join(selected_sites)} | "
+            f"**Borough** = {', '.join(selected_boroughs_6)} | "
+            f"**Pathway** = {', '.join(selected_pathways_6)}"
+        )
+        st.markdown(filters_msg_6)
+        
+        # Build the chart (line chart)
+        if split_by_6 is not None and split_by_6 in chart_data_6.columns:
+            fig6 = px.line(
+                chart_data_6,
+                x="date",
+                y="Total external delay days",
+                color=split_by_6,
+                line_group=split_by_6
+            )
+        else:
+            fig6 = px.line(
+                chart_data_6,
+                x="date",
+                y="Total external delay days"
+            )
+        
+        fig6.update_layout(
+            template="plotly_white",
+            font=dict(size=14),
+            margin=dict(l=0, r=0, t=40, b=0),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="left",
+                x=0.05
+            )
+        )
+        fig6.update_traces(line=dict(width=3))
+        st.plotly_chart(fig6, use_container_width=True)
 
