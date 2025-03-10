@@ -328,15 +328,10 @@ else:
 # Change Dates: Multiple change dates via a button
 # --------------------------------------
 st.sidebar.subheader("Change Dates")
-# Initialize session state if not already done
 if "change_dates" not in st.session_state:
     st.session_state.change_dates = []
-
-# When the "Add Change Date" button is clicked, add a new date (default to today)
 if st.sidebar.button("Add Change Date"):
     st.session_state.change_dates.append(datetime.date.today())
-
-# Display one date picker for each change date stored
 for i, cd in enumerate(st.session_state.change_dates):
     new_date = st.sidebar.date_input(f"Change Date {i+1}", value=cd, key=f"change_date_{i}")
     st.session_state.change_dates[i] = new_date
@@ -381,6 +376,7 @@ with tab1:
         with st.expander("Chart Settings"):
             show_trend_1 = st.checkbox("Show Trendline", value=False, key="adm_dis_trend")
             show_baseline_1 = st.checkbox("Show Baseline", value=False, key="adm_dis_base")
+            show_change_line_1 = st.checkbox("Show Change Date Markers", value=True, key="change_marker_1")
         baseline_means_1 = None
         if use_baseline and show_baseline_1:
             baseline_1 = aggregate_chart_data(baseline_data, frequency, chart_id=1)
@@ -397,9 +393,9 @@ with tab1:
                                  show_trendline=show_trend_1,
                                  show_baseline=show_baseline_1,
                                  baseline_means=baseline_means_1)
-        # Add all change date markers (all in the same color)
-        for cd in st.session_state.change_dates:
-            add_change_date_marker(fig1, cd)
+        if show_change_line_1:
+            for cd in st.session_state.change_dates:
+                add_change_date_marker(fig1, cd)
         st.plotly_chart(fig1, use_container_width=True)
 
         # ---- CHART 2: 21+ LoS & 14+ LoS ----
@@ -420,6 +416,7 @@ with tab1:
         with st.expander("Chart Settings"):
             show_trend_2 = st.checkbox("Show Trendline", value=False, key="los_trend")
             show_baseline_2 = st.checkbox("Show Baseline", value=False, key="los_base")
+            show_change_line_2 = st.checkbox("Show Change Date Markers", value=True, key="change_marker_2")
         baseline_means_2 = None
         if use_baseline and show_baseline_2:
             baseline_2 = aggregate_chart_data(baseline_data, frequency, chart_id=2)
@@ -436,8 +433,9 @@ with tab1:
                                  show_trendline=show_trend_2,
                                  show_baseline=show_baseline_2,
                                  baseline_means=baseline_means_2)
-        for cd in st.session_state.change_dates:
-            add_change_date_marker(fig2, cd)
+        if show_change_line_2:
+            for cd in st.session_state.change_dates:
+                add_change_date_marker(fig2, cd)
         st.plotly_chart(fig2, use_container_width=True)
 
         # ---- CHART 3: Escalation & Boarded Beds ----
@@ -459,6 +457,7 @@ with tab1:
             show_trend_3 = st.checkbox("Show Trendline", value=False, key="beds_trend")
             show_baseline_3 = st.checkbox("Show Baseline", value=False, key="beds_base")
             chart_type_3 = st.radio("Chart Type:", ["Stacked Bar", "Line"], index=0, key="beds_chart_type")
+            show_change_line_3 = st.checkbox("Show Change Date Markers", value=True, key="change_marker_3")
         baseline_means_3 = None
         if use_baseline and show_baseline_3:
             baseline_3 = aggregate_chart_data(baseline_data, frequency, chart_id=3)
@@ -481,8 +480,9 @@ with tab1:
                                             y_cols=["escalation beds", "boarded beds"],
                                             color_map=color_map_3,
                                             labels={"value": "Beds", "variable": "Bed Type"})
-        for cd in st.session_state.change_dates:
-            add_change_date_marker(fig3, cd)
+        if show_change_line_3:
+            for cd in st.session_state.change_dates:
+                add_change_date_marker(fig3, cd)
         st.plotly_chart(fig3, use_container_width=True)
 
         # ---- CHART 4: External Delays ----
@@ -498,6 +498,7 @@ with tab1:
                                                default=available_pathways, key="ext_pathway_4")
             split_option_4 = st.radio("Split By:", ["None", "Site", "Borough", "Pathway"],
                                       index=0, key="ext_split_4")
+            show_change_line_4 = st.checkbox("Show Change Date Markers", value=True, key="change_marker_4")
         if split_option_4 == "None":
             split_by_4 = None
         elif split_option_4 == "Site":
@@ -531,8 +532,9 @@ with tab1:
                            margin=dict(l=0, r=0, t=40, b=0),
                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0.05))
         fig4.update_traces(line=dict(width=3))
-        for cd in st.session_state.change_dates:
-            add_change_date_marker(fig4, cd)
+        if show_change_line_4:
+            for cd in st.session_state.change_dates:
+                add_change_date_marker(fig4, cd)
         st.plotly_chart(fig4, use_container_width=True)
 
         # ---- CHART 5: Average External Delay Days per Patient ----
@@ -548,6 +550,7 @@ with tab1:
                                                  default=available_pathways_5, key="ext_pathway_5")
             split_option_5 = st.radio("Split By:", ["None", "Site", "Borough", "Pathway"],
                                       index=0, key="ext_split_5")
+            show_change_line_5 = st.checkbox("Show Change Date Markers", value=True, key="change_marker_5")
         if split_option_5 == "None":
             split_by_5 = None
         elif split_option_5 == "Site":
@@ -573,8 +576,9 @@ with tab1:
                            margin=dict(l=0, r=0, t=40, b=0),
                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0.05))
         fig5.update_traces(line=dict(width=3))
-        for cd in st.session_state.change_dates:
-            add_change_date_marker(fig5, cd)
+        if show_change_line_5:
+            for cd in st.session_state.change_dates:
+                add_change_date_marker(fig5, cd)
         st.plotly_chart(fig5, use_container_width=True)
 
         # ---- CHART 6: Total External Delay Days ----
@@ -590,6 +594,7 @@ with tab1:
                                                  default=available_pathways_6, key="ext_pathway_6")
             split_option_6 = st.radio("Split By:", ["None", "Site", "Borough", "Pathway"],
                                       index=0, key="ext_split_6")
+            show_change_line_6 = st.checkbox("Show Change Date Markers", value=True, key="change_marker_6")
         if split_option_6 == "None":
             split_by_6 = None
         elif split_option_6 == "Site":
@@ -616,8 +621,9 @@ with tab1:
                            margin=dict(l=0, r=0, t=40, b=0),
                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0.05))
         fig6.update_traces(line=dict(width=3))
-        for cd in st.session_state.change_dates:
-            add_change_date_marker(fig6, cd)
+        if show_change_line_6:
+            for cd in st.session_state.change_dates:
+                add_change_date_marker(fig6, cd)
         st.plotly_chart(fig6, use_container_width=True)
 
 # ================================================
