@@ -7,6 +7,12 @@ import datetime
 import io
 
 # --------------------------------------
+# Callback to force a re-run when a chart setting changes
+# --------------------------------------
+def update_chart():
+    st.experimental_rerun()
+
+# --------------------------------------
 # Data Loading
 # --------------------------------------
 @st.cache_data
@@ -29,17 +35,11 @@ def load_external_delay_data():
 # Determine Default Date Range
 # --------------------------------------
 def get_default_date_range(df, freq):
-    """
-    Returns (start_date, end_date) for the default date range:
-      - If 'daily': last 30 days
-      - If 'weekly': last 26 complete weeks (Mon-Sun).
-    """
     if df.empty:
         today = datetime.date.today()
         return today, today
 
     max_date = df["date"].max().date()
-
     if freq == "weekly":
         last_monday = max_date - datetime.timedelta(days=max_date.weekday())
         start_date = last_monday - datetime.timedelta(weeks=25)
@@ -55,12 +55,9 @@ def get_default_date_range(df, freq):
     return start_date, end_date
 
 # --------------------------------------
-# Aggregation Logic (Supports chart_id=1..6 and split_by)
+# Aggregation Logic
 # --------------------------------------
 def aggregate_chart_data(df, frequency, chart_id, split_by=None):
-    """
-    Returns a daily or weekly aggregated DataFrame based on chart_id logic.
-    """
     if df.empty:
         return df
 
@@ -172,7 +169,7 @@ def aggregate_chart_data(df, frequency, chart_id, split_by=None):
     return weekly_df.reset_index(drop=True)
 
 # --------------------------------------
-# Helper: Return latest & previous values
+# Helper: Latest & Previous Values
 # --------------------------------------
 def get_latest_and_previous_values(series):
     if len(series) == 0:
@@ -262,7 +259,7 @@ def create_stacked_bar_chart(data, x_col, y_cols, color_map=None, labels=None):
     return fig
 
 # --------------------------------------
-# Helper function for adding change date markers
+# Helper: Add Change Date Marker
 # --------------------------------------
 def add_change_date_marker(fig, date, color="#00CC96"):
     x_val = pd.to_datetime(date)
@@ -282,7 +279,6 @@ st.title("Discharge Incentives Monitoring")
 st.sidebar.header("Filters & Settings")
 df = load_data()
 df2 = load_external_delay_data()
-
 frequency = st.sidebar.radio("Frequency", ["daily", "weekly"], index=0)
 start_default, end_default = get_default_date_range(df, frequency)
 date_input = st.sidebar.date_input("Select Date Range", value=(start_default, end_default))
@@ -328,15 +324,12 @@ else:
 # Change Dates: Multiple change dates via a button
 # --------------------------------------
 st.sidebar.subheader("Change Dates")
-# Initialize session state if not already done
 if "change_dates" not in st.session_state:
     st.session_state.change_dates = []
 
-# When the "Add Change Date" button is clicked, add a new date (default to today)
 if st.sidebar.button("Add Change Date"):
     st.session_state.change_dates.append(datetime.date.today())
 
-# Display one date picker for each change date stored
 for i, cd in enumerate(st.session_state.change_dates):
     new_date = st.sidebar.date_input(f"Change Date {i+1}", value=cd, key=f"change_date_{i}")
     st.session_state.change_dates[i] = new_date
@@ -349,7 +342,6 @@ with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
     filtered_data.to_excel(writer, sheet_name="SitrepData", index=False)
     filtered_data2.to_excel(writer, sheet_name="ExternalDelays", index=False)
 excel_bytes = output.getvalue()
-
 st.sidebar.download_button(label="Download Data",
                            data=excel_bytes,
                            file_name="data_extract.xlsx",
@@ -379,8 +371,8 @@ with tab1:
                       value=int(latest_dis),
                       delta=int(latest_dis - prev_dis))
         with st.expander("Chart Settings"):
-            show_trend_1 = st.checkbox("Show Trendline", value=False, key="adm_dis_trend")
-            show_baseline_1 = st.checkbox("Show Baseline", value=False, key="adm_dis_base")
+            show_trend_1 = st.checkbox("Show Trendline", value=False, key="adm_dis_trend", on_change=update_chart)
+            show_baseline_1 = st.checkbox("Show Baseline", value=False, key="adm_dis_base", on_change=update_chart)
         baseline_means_1 = None
         if use_baseline and show_baseline_1:
             baseline_1 = aggregate_chart_data(baseline_data, frequency, chart_id=1)
@@ -397,7 +389,6 @@ with tab1:
                                  show_trendline=show_trend_1,
                                  show_baseline=show_baseline_1,
                                  baseline_means=baseline_means_1)
-        # Add all change date markers (all in the same color)
         for cd in st.session_state.change_dates:
             add_change_date_marker(fig1, cd)
         st.plotly_chart(fig1, use_container_width=True)
@@ -418,8 +409,8 @@ with tab1:
                       value=float(round(latest_14plus, 1)),
                       delta=float(round(latest_14plus - prev_14plus, 1)))
         with st.expander("Chart Settings"):
-            show_trend_2 = st.checkbox("Show Trendline", value=False, key="los_trend")
-            show_baseline_2 = st.checkbox("Show Baseline", value=False, key="los_base")
+            show_trend_2 = st.checkbox("Show Trendline", value=False, key="los_trend", on_change=update_chart)
+            show_baseline_2 = st.checkbox("Show Baseline", value=False, key="los_base", on_change=update_chart)
         baseline_means_2 = None
         if use_baseline and show_baseline_2:
             baseline_2 = aggregate_chart_data(baseline_data, frequency, chart_id=2)
@@ -456,9 +447,9 @@ with tab1:
                       value=float(round(latest_boarded, 1)),
                       delta=float(round(latest_boarded - prev_boarded, 1)))
         with st.expander("Chart Settings"):
-            show_trend_3 = st.checkbox("Show Trendline", value=False, key="beds_trend")
-            show_baseline_3 = st.checkbox("Show Baseline", value=False, key="beds_base")
-            chart_type_3 = st.radio("Chart Type:", ["Stacked Bar", "Line"], index=0, key="beds_chart_type")
+            show_trend_3 = st.checkbox("Show Trendline", value=False, key="beds_trend", on_change=update_chart)
+            show_baseline_3 = st.checkbox("Show Baseline", value=False, key="beds_base", on_change=update_chart)
+            chart_type_3 = st.radio("Chart Type:", ["Stacked Bar", "Line"], index=0, key="beds_chart_type", on_change=update_chart)
         baseline_means_3 = None
         if use_baseline and show_baseline_3:
             baseline_3 = aggregate_chart_data(baseline_data, frequency, chart_id=3)
@@ -492,12 +483,12 @@ with tab1:
             st.write("**Filter by Borough and Pathway**")
             available_boroughs = sorted(filtered_data2["Borough"].dropna().unique())
             selected_boroughs = st.multiselect("Select Borough(s)", options=available_boroughs,
-                                               default=available_boroughs, key="ext_borough_4")
+                                               default=available_boroughs, key="ext_borough_4", on_change=update_chart)
             available_pathways = sorted(filtered_data2["Pathway"].dropna().unique())
             selected_pathways = st.multiselect("Select Pathway(s)", options=available_pathways,
-                                               default=available_pathways, key="ext_pathway_4")
+                                               default=available_pathways, key="ext_pathway_4", on_change=update_chart)
             split_option_4 = st.radio("Split By:", ["None", "Site", "Borough", "Pathway"],
-                                      index=0, key="ext_split_4")
+                                      index=0, key="ext_split_4", on_change=update_chart)
         if split_option_4 == "None":
             split_by_4 = None
         elif split_option_4 == "Site":
@@ -542,12 +533,12 @@ with tab1:
             st.write("**Filter by Borough and Pathway**")
             available_boroughs_5 = sorted(filtered_data2["Borough"].dropna().unique())
             selected_boroughs_5 = st.multiselect("Select Borough(s)", options=available_boroughs_5,
-                                                 default=available_boroughs_5, key="ext_borough_5")
+                                                 default=available_boroughs_5, key="ext_borough_5", on_change=update_chart)
             available_pathways_5 = sorted(filtered_data2["Pathway"].dropna().unique())
             selected_pathways_5 = st.multiselect("Select Pathway(s)", options=available_pathways_5,
-                                                 default=available_pathways_5, key="ext_pathway_5")
+                                                 default=available_pathways_5, key="ext_pathway_5", on_change=update_chart)
             split_option_5 = st.radio("Split By:", ["None", "Site", "Borough", "Pathway"],
-                                      index=0, key="ext_split_5")
+                                      index=0, key="ext_split_5", on_change=update_chart)
         if split_option_5 == "None":
             split_by_5 = None
         elif split_option_5 == "Site":
@@ -584,12 +575,12 @@ with tab1:
             st.write("**Filter by Borough and Pathway**")
             available_boroughs_6 = sorted(filtered_data2["Borough"].dropna().unique())
             selected_boroughs_6 = st.multiselect("Select Borough(s)", options=available_boroughs_6,
-                                                 default=available_boroughs_6, key="ext_borough_6")
+                                                 default=available_boroughs_6, key="ext_borough_6", on_change=update_chart)
             available_pathways_6 = sorted(filtered_data2["Pathway"].dropna().unique())
             selected_pathways_6 = st.multiselect("Select Pathway(s)", options=available_pathways_6,
-                                                 default=available_pathways_6, key="ext_pathway_6")
+                                                 default=available_pathways_6, key="ext_pathway_6", on_change=update_chart)
             split_option_6 = st.radio("Split By:", ["None", "Site", "Borough", "Pathway"],
-                                      index=0, key="ext_split_6")
+                                      index=0, key="ext_split_6", on_change=update_chart)
         if split_option_6 == "None":
             split_by_6 = None
         elif split_option_6 == "Site":
