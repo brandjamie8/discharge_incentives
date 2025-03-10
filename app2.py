@@ -499,13 +499,18 @@ with tab1:
             split_option_4 = st.radio("Split By:", ["None", "Site", "Borough", "Pathway"],
                                       index=0, key="ext_split_4")
             show_change_line_4 = st.checkbox("Show Change Date Markers", value=True, key="change_marker_4")
+        # Apply borough and pathway filters
+        filtered_data2_ext = filtered_data2[
+            (filtered_data2["Borough"].isin(selected_boroughs)) &
+            (filtered_data2["Pathway"].isin(selected_pathways))
+        ]
         if split_option_4 == "None":
             split_by_4 = None
         elif split_option_4 == "Site":
             split_by_4 = "site"
         else:
             split_by_4 = split_option_4
-        chart_data_4 = aggregate_chart_data(filtered_data2, frequency, chart_id=4, split_by=split_by_4)
+        chart_data_4 = aggregate_chart_data(filtered_data2_ext, frequency, chart_id=4, split_by=split_by_4)
         if split_by_4 is None and not chart_data_4.empty:
             latest_nmctr, prev_nmctr = get_latest_and_previous_values(chart_data_4["NMCTR external delay"])
             c7, c8 = st.columns(2)
@@ -551,13 +556,18 @@ with tab1:
             split_option_5 = st.radio("Split By:", ["None", "Site", "Borough", "Pathway"],
                                       index=0, key="ext_split_5")
             show_change_line_5 = st.checkbox("Show Change Date Markers", value=True, key="change_marker_5")
+        # Apply borough and pathway filters
+        filtered_data2_avg = filtered_data2[
+            (filtered_data2["Borough"].isin(selected_boroughs_5)) &
+            (filtered_data2["Pathway"].isin(selected_pathways_5))
+        ]
         if split_option_5 == "None":
             split_by_5 = None
         elif split_option_5 == "Site":
             split_by_5 = "site"
         else:
             split_by_5 = split_option_5
-        chart_data_5 = aggregate_chart_data(filtered_data2, frequency, chart_id=5, split_by=split_by_5)
+        chart_data_5 = aggregate_chart_data(filtered_data2_avg, frequency, chart_id=5, split_by=split_by_5)
         if split_by_5 is None and not chart_data_5.empty:
             latest_avg, prev_avg = get_latest_and_previous_values(chart_data_5["average_delay_days"])
             st.metric(label="Average Delay (Latest vs Previous)",
@@ -595,13 +605,18 @@ with tab1:
             split_option_6 = st.radio("Split By:", ["None", "Site", "Borough", "Pathway"],
                                       index=0, key="ext_split_6")
             show_change_line_6 = st.checkbox("Show Change Date Markers", value=True, key="change_marker_6")
+        # Apply borough and pathway filters
+        filtered_data2_total = filtered_data2[
+            (filtered_data2["Borough"].isin(selected_boroughs_6)) &
+            (filtered_data2["Pathway"].isin(selected_pathways_6))
+        ]
         if split_option_6 == "None":
             split_by_6 = None
         elif split_option_6 == "Site":
             split_by_6 = "site"
         else:
             split_by_6 = split_option_6
-        chart_data_6 = aggregate_chart_data(filtered_data2, frequency, chart_id=6, split_by=split_by_6)
+        chart_data_6 = aggregate_chart_data(filtered_data2_total, frequency, chart_id=6, split_by=split_by_6)
         if split_by_6 is None and not chart_data_6.empty:
             latest_total, prev_total = get_latest_and_previous_values(chart_data_6["Total external delay days"])
             st.metric(label="Total Delay Days (Latest vs Previous)",
