@@ -4,6 +4,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import datetime
+import io
 
 # --------------------------------------
 # Data Loading
@@ -175,17 +176,13 @@ def aggregate_chart_data(df, frequency, chart_id, split_by=None):
         if split_by and split_by in df.columns:
             sum_df = (
                 daily_df.groupby(split_by)
-                        .resample("W-MON", label="left", closed="left")[
-                            ["NMCTR external delay", "Total external delay days"]
-                        ]
+                        .resample("W-MON", label="left", closed="left")[["NMCTR external delay", "Total external delay days"]]
                         .sum()
                         .reset_index()
             )
         else:
             sum_df = (
-                daily_df.resample("W-MON", label="left", closed="left")[
-                    ["NMCTR external delay", "Total external delay days"]
-                ]
+                daily_df.resample("W-MON", label="left", closed="left")[["NMCTR external delay", "Total external delay days"]]
                 .sum()
                 .reset_index()
             )
@@ -382,6 +379,29 @@ def create_stacked_bar_chart(data, x_col, y_cols, color_map=None, labels=None):
     return fig
 
 # --------------------------------------
+# Helper function for adding change date markers
+# --------------------------------------
+def add_change_date_marker(fig, date, color):
+    x_val = pd.to_datetime(date)
+    formatted_date = date.strftime("%d-%b-%y")
+    fig.add_vline(
+        x=x_val,
+        line_width=2,
+        line_dash="dot",
+        line_color=color
+    )
+    fig.add_annotation(
+        x=x_val,
+        y=1.05,
+        xref="x",
+        yref="paper",
+        text=formatted_date,
+        showarrow=False,
+        font=dict(color=color),
+        yanchor="bottom"
+    )
+
+# --------------------------------------
 # Streamlit Layout
 # --------------------------------------
 st.set_page_config(page_title="LGT Discharge Incentives Dashboard", layout="wide")
@@ -453,26 +473,26 @@ else:
     baseline_data = pd.DataFrame()
     baseline_data2 = pd.DataFrame()
 
-# --- NEW: Change Date option (appears below Baseline and above Download) ---
+# --- Change Date options ---
 st.sidebar.subheader("Change Date")
 use_change_date = st.sidebar.checkbox("Define a change date?", value=False)
 if use_change_date:
-    change_date = st.sidebar.date_input("Select change date (for marker):")
+    change_date = st.sidebar.date_input("Select change date (for marker):", key="change_date")
 else:
     change_date = None
 
-# --- Move the Download Data button to the BOTTOM of the sidebar ---
-import io
+st.sidebar.subheader("Additional Change Date")
+use_additional_change_date = st.sidebar.checkbox("Define an additional change date?", value=False)
+if use_additional_change_date:
+    additional_change_date = st.sidebar.date_input("Select additional change date (for marker):", key="additional_change_date")
+else:
+    additional_change_date = None
 
-# Create a BytesIO buffer
+# --- Download Data button at the bottom of the sidebar ---
 output = io.BytesIO()
-
-# Write to an Excel file in memory
 with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
     filtered_data.to_excel(writer, sheet_name="SitrepData", index=False)
     filtered_data2.to_excel(writer, sheet_name="ExternalDelays", index=False)
-
-# Get the Excel file bytes
 excel_bytes = output.getvalue()
 
 st.sidebar.download_button(
@@ -518,7 +538,7 @@ with tab1:
         with st.expander("Chart Settings"):
             show_trend_1 = st.checkbox("Show Trendline", value=False, key="adm_dis_trend")
             show_baseline_1 = st.checkbox("Show Baseline", value=False, key="adm_dis_base")
-            if use_change_date:
+            if use_change_date or use_additional_change_date:
                 show_change_line_1 = st.checkbox("Show Change Date Marker", value=False, key="change_marker_1")
             else:
                 show_change_line_1 = False
@@ -543,25 +563,11 @@ with tab1:
             show_baseline=show_baseline_1,
             baseline_means=baseline_means_1
         )
-        if use_change_date and show_change_line_1 and change_date:
-            x_val = pd.to_datetime(change_date)
-            formatted_date = change_date.strftime("%d-%b-%y")
-            fig1.add_vline(
-                x=x_val,
-                line_width=2,
-                line_dash="dot",
-                line_color="#00CC96"
-            )
-            fig1.add_annotation(
-                x=x_val,
-                y=1.05,
-                xref="x",
-                yref="paper",
-                text=formatted_date,
-                showarrow=False,
-                font=dict(color="#00CC96"),
-                yanchor="bottom"
-            )
+        if show_change_line_1:
+            if use_change_date and change_date:
+                add_change_date_marker(fig1, change_date, "#00CC96")
+            if use_additional_change_date and additional_change_date:
+                add_change_date_marker(fig1, additional_change_date, "#FF5733")
         st.plotly_chart(fig1, use_container_width=True)
 
         # ------------------------------------------------
@@ -592,7 +598,7 @@ with tab1:
         with st.expander("Chart Settings"):
             show_trend_2 = st.checkbox("Show Trendline", value=False, key="los_trend")
             show_baseline_2 = st.checkbox("Show Baseline", value=False, key="los_base")
-            if use_change_date:
+            if use_change_date or use_additional_change_date:
                 show_change_line_2 = st.checkbox("Show Change Date Marker", value=False, key="change_marker_2")
             else:
                 show_change_line_2 = False
@@ -620,25 +626,11 @@ with tab1:
             show_baseline=show_baseline_2,
             baseline_means=baseline_means_2
         )
-        if use_change_date and show_change_line_2 and change_date:
-            x_val = pd.to_datetime(change_date)
-            formatted_date = change_date.strftime("%d-%b-%y")
-            fig2.add_vline(
-                x=x_val,
-                line_width=2,
-                line_dash="dot",
-                line_color="#00CC96"
-            )
-            fig2.add_annotation(
-                x=x_val,
-                y=1.05,
-                xref="x",
-                yref="paper",
-                text=formatted_date,
-                showarrow=False,
-                font=dict(color="#00CC96"),
-                yanchor="bottom"
-            )
+        if show_change_line_2:
+            if use_change_date and change_date:
+                add_change_date_marker(fig2, change_date, "#00CC96")
+            if use_additional_change_date and additional_change_date:
+                add_change_date_marker(fig2, additional_change_date, "#FF5733")
         st.plotly_chart(fig2, use_container_width=True)
 
         # ------------------------------------------------
@@ -675,7 +667,7 @@ with tab1:
                 index=0,
                 key="beds_chart_type"
             )
-            if use_change_date:
+            if use_change_date or use_additional_change_date:
                 show_change_line_3 = st.checkbox("Show Change Date Marker", value=False, key="change_marker_3")
             else:
                 show_change_line_3 = False
@@ -713,25 +705,11 @@ with tab1:
                 color_map=color_map_3,
                 labels={"value": "Beds", "variable": "Bed Type"}
             )
-        if use_change_date and show_change_line_3 and change_date:
-            x_val = pd.to_datetime(change_date)
-            formatted_date = change_date.strftime("%d-%b-%y")
-            fig3.add_vline(
-                x=x_val,
-                line_width=2,
-                line_dash="dot",
-                line_color="#00CC96"
-            )
-            fig3.add_annotation(
-                x=x_val,
-                y=1.05,
-                xref="x",
-                yref="paper",
-                text=formatted_date,
-                showarrow=False,
-                font=dict(color="#00CC96"),
-                yanchor="bottom"
-            )
+        if show_change_line_3:
+            if use_change_date and change_date:
+                add_change_date_marker(fig3, change_date, "#00CC96")
+            if use_additional_change_date and additional_change_date:
+                add_change_date_marker(fig3, additional_change_date, "#FF5733")
         st.plotly_chart(fig3, use_container_width=True)
 
         # ------------------------------------------------
@@ -766,7 +744,7 @@ with tab1:
                 index=0,
                 key="ext_split_4"
             )
-            if use_change_date:
+            if use_change_date or use_additional_change_date:
                 show_change_line_4 = st.checkbox("Show Change Date Marker", value=False, key="change_marker_4")
             else:
                 show_change_line_4 = False
@@ -856,25 +834,11 @@ with tab1:
             )
         )
         fig4.update_traces(line=dict(width=3))
-        if use_change_date and show_change_line_4 and change_date:
-            x_val = pd.to_datetime(change_date)
-            formatted_date = change_date.strftime("%d-%b-%y")
-            fig4.add_vline(
-                x=x_val,
-                line_width=2,
-                line_dash="dot",
-                line_color="#00CC96"
-            )
-            fig4.add_annotation(
-                x=x_val,
-                y=1.05,
-                xref="x",
-                yref="paper",
-                text=formatted_date,
-                showarrow=False,
-                font=dict(color="#00CC96"),
-                yanchor="bottom"
-            )
+        if show_change_line_4:
+            if use_change_date and change_date:
+                add_change_date_marker(fig4, change_date, "#00CC96")
+            if use_additional_change_date and additional_change_date:
+                add_change_date_marker(fig4, additional_change_date, "#FF5733")
         st.plotly_chart(fig4, use_container_width=True)
         
         # ------------------------------------------------
@@ -908,7 +872,7 @@ with tab1:
                 index=0,
                 key="ext_split_5"
             )
-            if use_change_date:
+            if use_change_date or use_additional_change_date:
                 show_change_line_5 = st.checkbox("Show Change Date Marker", value=False, key="change_marker_5")
             else:
                 show_change_line_5 = False
@@ -980,25 +944,11 @@ with tab1:
             )
         )
         fig5.update_traces(line=dict(width=3))
-        if use_change_date and show_change_line_5 and change_date:
-            x_val = pd.to_datetime(change_date)
-            formatted_date = change_date.strftime("%d-%b-%y")
-            fig5.add_vline(
-                x=x_val,
-                line_width=2,
-                line_dash="dot",
-                line_color="#00CC96"
-            )
-            fig5.add_annotation(
-                x=x_val,
-                y=1.05,
-                xref="x",
-                yref="paper",
-                text=formatted_date,
-                showarrow=False,
-                font=dict(color="#00CC96"),
-                yanchor="bottom"
-            )
+        if show_change_line_5:
+            if use_change_date and change_date:
+                add_change_date_marker(fig5, change_date, "#00CC96")
+            if use_additional_change_date and additional_change_date:
+                add_change_date_marker(fig5, additional_change_date, "#FF5733")
         st.plotly_chart(fig5, use_container_width=True)
 
         # ------------------------------------------------
@@ -1032,7 +982,7 @@ with tab1:
                 index=0,
                 key="ext_split_6"
             )
-            if use_change_date:
+            if use_change_date or use_additional_change_date:
                 show_change_line_6 = st.checkbox("Show Change Date Marker", value=False, key="change_marker_6")
             else:
                 show_change_line_6 = False
@@ -1103,23 +1053,15 @@ with tab1:
             )
         )
         fig6.update_traces(line=dict(width=3))
-        if use_change_date and show_change_line_6 and change_date:
-            x_val = pd.to_datetime(change_date)
-            formatted_date = change_date.strftime("%d-%b-%y")
-            fig6.add_vline(
-                x=x_val,
-                line_width=2,
-                line_dash="dot",
-                line_color="#00CC96"
-            )
-            fig6.add_annotation(
-                x=x_val,
-                y=1.05,
-                xref="x",
-                yref="paper",
-                text=formatted_date,
-                showarrow=False,
-                font=dict(color="#00CC96"),
-                yanchor="bottom"
-            )
+        if show_change_line_6:
+            if use_change_date and change_date:
+                add_change_date_marker(fig6, change_date, "#00CC96")
+            if use_additional_change_date and additional_change_date:
+                add_change_date_marker(fig6, additional_change_date, "#FF5733")
         st.plotly_chart(fig6, use_container_width=True)
+        
+# ================================================
+# TAB 2: DPTL METRICS
+# ================================================
+with tab2:
+    st.write("DPTL Metrics content goes here...")
