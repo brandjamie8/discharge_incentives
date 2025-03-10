@@ -10,7 +10,7 @@ import io
 # Callback to force a re-run when a chart setting changes
 # --------------------------------------
 def update_chart():
-    st.experimental_rerun()
+    st.rerun()
 
 # --------------------------------------
 # Data Loading
