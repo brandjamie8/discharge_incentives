@@ -20,7 +20,7 @@ def load_data():
 @st.cache_data
 def load_external_delay_data():
     """Load and prepare the second CSV data for external delays."""
-    df2 = pd.read_csv("data/ExternalDelays.csv", encoding="cp1252")
+    df2 = pd.read_csv("data/ExternalDelays.csv")
     df2["date"] = pd.to_datetime(df2["date"], format="%d/%m/%Y", errors="coerce")
     df2.sort_values("date", inplace=True)
     return df2
